@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Shadows+Into+Light&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: content-box;
+    font-family: 'Shadows Into Light', cursive, sans-serif;
+    letter-spacing: 0.25ch;
+    transition: all 0.25s ease;
+}
+
+h1, h2, h3, .title {
+    font-family: 'Indie Flower', cursive, sans-serif;
+}
+
+body {
+    background-color: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+}
+
+.rainbow {
+    font-family: 'Indie Flower', cursive, sans-serif;
+    letter-spacing: 0.35ch;
+    font-weight: 800;
+    font-size: 3rem;
+}
+
+.rainbow-1 {
+    color: violet;
+}
+
+.rainbow-2 {
+    color: indigo;
+}
+
+.rainbow-3 {
+    color: blue;
+}
+
+.rainbow-4 {
+    color: green;
+}
+
+.rainbow-5 {
+    color: black;
+}
+
+.rainbow-6 {
+    color: orange;
+}
+
+.rainbow-7 {
+    color: red;
+}
+
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0;
+}
+
+.material-symbols-outlined:hover {
+    font-variation-settings: "FILL" 1;
+}
