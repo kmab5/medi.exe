@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // alert("Loaded!");
+    const darkToggle = document.querySelector(".dark-toggle");
     const rainbow = document.querySelectorAll(".rainbow");
     let rainbowCtr = 0;
     let speed = 500;
@@ -18,9 +18,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function toggleMode(){
         document.body.classList.toggle("light");
         document.body.classList.toggle("dark");
+        darkToggle.classList.toggle("active-icon");
     }
 
-    iteraterainbow();
+    darkToggle.addEventListener("click", toggleMode);
 
-    setTimeout(toggleMode, 2000);
+    iteraterainbow();
 });
