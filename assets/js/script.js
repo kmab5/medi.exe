@@ -26,8 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
     darkToggle.addEventListener("click", toggleMode);
 
     boxes.forEach((box) => {
-        setTimeout(() => {box.children[0].classList.add("idle");}, delay+=200);
-        box.addEventListener("click", () => {
+        setTimeout(() => {box.children[0].classList.add("idle");}, delay+=400);
+        box.children[0].addEventListener("click", () => {
             boxes.forEach((boxi) => {
                 if(boxi !== box) boxi.classList.remove("active");
             });
