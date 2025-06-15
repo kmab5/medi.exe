@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Shadows+Into+Light&display=swap');
 
+:root {
+    --grad: 0.4;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -21,6 +25,17 @@ body {
     justify-content: center;
     align-items: stretch;
     min-height: 100vh;
+    overflow: hidden;
+}
+
+.bg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(0, 0, 0, var(--grad)) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, 0) 80%, rgba(0, 0, 0, var(--grad)) 100%);
+    z-index: -1;
 }
 
 .dark-toggle {
@@ -51,7 +66,6 @@ h1.title {
     letter-spacing: 0.35ch;
     font-weight: 800;
     cursor: pointer;
-    /* font-size: 3rem; */
 }
 
 .rainbow-1 {
@@ -84,6 +98,7 @@ h1.title {
 
 .material-symbols-outlined {
     font-variation-settings: "FILL" 0;
+    cursor: pointer;
 }
 
 .active-icon {
@@ -98,16 +113,85 @@ main {
     gap: 2rem;
 }
 
-.box {
+.boxes {
     position: absolute;
-    left: 5rem;
-    top: 5rem;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    justify-content: center;
+    gap: 2rem;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.box {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    text-align: center;
+    max-width: 50ch;
+    color: var(--md-on-secondary-container);
+    padding: 1rem;
+    border-radius: 1rem;
+}
+
+.box:hover {
+    border: 0.01rem solid var(--md-outline);
+}
+
+.boxes.left {
+    left: 2rem;
+    align-items: flex-start;
+}
+
+.boxes.right {
+    right: 2rem;
+    align-items: flex-end;
 }
 
 .box .text {
-    display: none;
+    transition: font-size 0.15s ease-in-out;
+    font-size: 0;
+}
+
+.box .icon {
+    font-size: 2rem;
+    line-height: 0;
+}
+
+.idle {
+    animation: float 5s linear infinite;
+}
+
+.box.active .icon, .box:hover .icon {
+    animation: none;
+}
+
+.box.active .text {
+    padding-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.box.active .text h2 {
+    font-size: 1rem;
+}
+
+.box.active .material-symbols-outlined {
+    font-variation-settings: "FILL" 1;
+}
+
+.box.active {
+    background-color: var(--md-secondary-container);
+    border: 0.01rem solid var(--md-outline);
+}
+
+
+@keyframes float {
+    from {
+        transform: rotate(0deg) translateY(-0.25rem) rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg) translateY(-0.25rem) rotate(-360deg);
+    }
 }

@@ -1,8 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const boxes = document.querySelectorAll(".box");
     const darkToggle = document.querySelector(".dark-toggle");
     const rainbow = document.querySelectorAll(".rainbow");
     let rainbowCtr = 0;
     let speed = 500;
+    let delay = -200;
     
     function iteraterainbow(){
         rainbowCtr++;
@@ -22,6 +24,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     darkToggle.addEventListener("click", toggleMode);
+
+    boxes.forEach((box) => {
+        setTimeout(() => {box.children[0].classList.add("idle");}, delay+=200);
+        box.addEventListener("click", () => {
+            boxes.forEach((boxi) => {
+                if(boxi !== box) boxi.classList.remove("active");
+            });
+            box.classList.toggle("active");
+        });
+    });
 
     iteraterainbow();
 });
