@@ -51,7 +51,7 @@ body {
 }
 
 .dark-toggle {
-    font-size: 1rem;
+    font-size: 1.5rem;
     position: absolute;
     padding: 0.5rem;
     right: 1rem;
@@ -111,7 +111,7 @@ h1.title {
     color: red;
 }
 
-.material-symbols-outlined {
+.material-symbols-rounded {
     font-variation-settings: "FILL" 0;
     cursor: pointer;
 }
@@ -185,14 +185,14 @@ main {
 
 .box.active .text {
     padding-top: 0.5rem;
-    font-size: 0.8rem;
+    font-size: 0.7.5rem;
 }
 
 .box.active .text h2 {
     font-size: 1rem;
 }
 
-.box.active .material-symbols-outlined {
+.box.active .material-symbols-rounded {
     font-variation-settings: "FILL" 1;
 }
 
@@ -221,6 +221,60 @@ main {
     object-position: center;
 }
 
+.controls {
+    position: absolute;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.btns {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    font-size: 1rem;
+    color: color-mix(in srgb, var(--md-secondary-fixed), transparent 50%);
+}
+
+.btn:hover {
+    color: color-mix(in srgb, var(--md-secondary-fixed), transparent 0%);
+    transform: scale(1.1);
+}
+
+.progress {
+    align-self: stretch;
+    background-color: color-mix(in srgb, var(--md-secondary-fixed), transparent 50%);
+    height: 0.35rem;
+    border-radius: 2rem;
+    padding: 0.1rem;
+}
+
+.indicator {
+    background-color: var(--md-secondary-fixed);
+    width: 33%;
+    height: 100%;
+    border-radius: 1rem;
+    position: relative;
+    left: 0%;
+}
+
+.ind-1 {
+    left: 0%;
+}
+
+.ind-2 {
+    left: 33%;
+}
+
+.ind-3 {
+    left: 67%;
+}
+
 @keyframes float {
     from {
         transform: rotate(0deg) translateY(-0.25rem) rotate(0deg);
@@ -243,7 +297,7 @@ main {
         height: auto;
         width: 100%;
     }
-    
+
     .boxes.left {
         left: 0;
         bottom: 2rem;
@@ -251,11 +305,11 @@ main {
     }
     .boxes.right {
         right: 0;
-        bottom: 7rem;
+        bottom: 7.5rem;
     }
 
     .boxes.left:has(.active) {
-        bottom: 7rem;
+        bottom: 7.5rem;
     }
 
     .boxes.left:has(.active) ~ .boxes.right {
@@ -263,7 +317,7 @@ main {
     }
     
     .boxes.right:has(.active) {
-        bottom: 7rem;
+        bottom: 7.5rem;
     }
 
     .boxes.right:has(.active) ~ .boxes.left {
@@ -284,5 +338,13 @@ main {
 @media (max-width: 360px) {
     :root {
         font-size: 8px;
+    }
+
+    .controls {
+        top: 2rem;
+        left: 2rem;
+        bottom: auto;
+        right: auto;
+        flex-direction: column-reverse;
     }
 }

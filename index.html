@@ -3,38 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1&icon_names=call,dark_mode,home,palette,person,search" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@0..1&icon_names=call,chevron_left,chevron_right,dark_mode,home,palette,person,search" />
     <link rel="shortcut icon" href="./assets/img/favicon.png" type="image/x-icon">
     <link rel="stylesheet" href="./assets/css/color.css">
     <link rel="stylesheet" href="./assets/css/style.css">
     <title>medi.exe</title>
 </head>
 <body class="light">
-    <span class="material-symbols-outlined dark-toggle" draggable="true">dark_mode</span>
+    <span class="material-symbols-rounded dark-toggle" draggable="true">dark_mode</span>
     <div class="bg"></div>
     <div class="glass"></div>
     <div class="vid-wrapper">
-            <video src="./assets/vid/medi-lq.mp4" autoplay loop muted></video>
+        <video class="vid" src="./assets/vid/medi-lq.mp4" autoplay loop muted></video>
+        <!-- <video class="vid" src="./assets/vid/snake-lq.mp4" autoplay loop muted></video> -->
+        <!-- <video class="vid" src="./assets/vid/op-lq.mp4" autoplay loop muted></video> -->
+    </div>
+    <div class="controls">
+        <div class="btns">
+            <span class="material-symbols-rounded btn" draggable="true">chevron_left</span>
+            <span class="material-symbols-rounded btn" draggable="true">chevron_right</span>
         </div>
+        <div class="progress"><div class="indicator ind-1"></div></div>
+    </div>
     <main>
         <h1 class="title" draggable="true">Welcome to <span class="rainbow">m</span><span class="rainbow">e</span><span class="rainbow">d</span><span class="rainbow">i</span><span class="rainbow">.e</span><span class="rainbow">x</span><span class="rainbow">e</span></h1>
         <div class="boxes left">
             <div draggable="true" class="box home">
-                <div class="icon"><span class="material-symbols-outlined">home</span></div>
+                <div class="icon"><span class="material-symbols-rounded">home</span></div>
                 <div class="text">
                     <h2>Website?</h2>
                     Lorem ipsum, dolor sit amet consectetur adipisicing elit. Recusandae libero rem explicabo officia necessitatibus, ea omnis? Deserunt vero, laboriosam quia deleniti cumque architecto sint eveniet est. Molestias voluptatum nemo at? Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime dignissimos et quidem cum tempora totam, aperiam asperiores cumque unde nisi, magnam repellendus commodi. Autem porro ipsa minima dolorum consequuntur praesentium.
                 </div>
             </div>
             <div draggable="true" class="box about-me">
-                <div class="icon"><span class="material-symbols-outlined">person</span></div>
+                <div class="icon"><span class="material-symbols-rounded">person</span></div>
                 <div class="text">
                     <h2>About Me!</h2>
                     Lorem ipsum, dolor sit amet consectetur adipisicing elit. Recusandae libero rem explicabo officia necessitatibus, ea omnis? Deserunt vero, laboriosam quia deleniti cumque architecto sint eveniet est. Molestias voluptatum nemo at? Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime dignissimos et quidem cum tempora totam, aperiam asperiores cumque unde nisi, magnam repellendus commodi. Autem porro ipsa minima dolorum consequuntur praesentium.
                 </div>
             </div>
             <div draggable="true" class="box palette">
-                <div class="icon"><span class="material-symbols-outlined">palette</span></div>
+                <div class="icon"><span class="material-symbols-rounded">palette</span></div>
                 <div class="text">
                     <h2>My Works!</h2>
                     Lorem ipsum, dolor sit amet consectetur adipisicing elit. Recusandae libero rem explicabo officia necessitatibus, ea omnis? Deserunt vero, laboriosam quia deleniti cumque architecto sint eveniet est. Molestias voluptatum nemo at? Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime dignissimos et quidem cum tempora totam, aperiam asperiores cumque unde nisi, magnam repellendus commodi. Autem porro ipsa minima dolorum consequuntur praesentium.
@@ -43,14 +52,14 @@
         </div>
         <div class="boxes right">
             <div draggable="true" class="box contact">
-                <div class="icon"><span class="material-symbols-outlined">call</span></div>
+                <div class="icon"><span class="material-symbols-rounded">call</span></div>
                 <div class="text">
                     <h2>Contact Me!</h2>
                     Lorem ipsum, dolor sit amet consectetur adipisicing elit. Recusandae libero rem explicabo officia necessitatibus, ea omnis? Deserunt vero, laboriosam quia deleniti cumque architecto sint eveniet est. Molestias voluptatum nemo at? Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime dignissimos et quidem cum tempora totam, aperiam asperiores cumque unde nisi, magnam repellendus commodi. Autem porro ipsa minima dolorum consequuntur praesentium.
                 </div>
             </div>
             <div draggable="true" class="box website">
-                <div class="icon"><span class="material-symbols-outlined">search</span></div>
+                <div class="icon"><span class="material-symbols-rounded">search</span></div>
                 <div class="text">
                     <h2>Website!</h2>
                     Lorem ipsum, dolor sit amet consectetur adipisicing elit. Recusandae libero rem explicabo officia necessitatibus, ea omnis? Deserunt vero, laboriosam quia deleniti cumque architecto sint eveniet est. Molestias voluptatum nemo at? Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime dignissimos et quidem cum tempora totam, aperiam asperiores cumque unde nisi, magnam repellendus commodi. Autem porro ipsa minima dolorum consequuntur praesentium.
