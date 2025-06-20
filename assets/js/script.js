@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const boxes = document.querySelectorAll(".box");
     const darkToggle = document.querySelector(".dark-toggle");
     const rainbow = document.querySelectorAll(".rainbow");
+    const vids = document.querySelectorAll(".vid");
     const btns = document.querySelectorAll(".btn");
     const indicator = document.querySelector(".indicator");
     let vid_number = 1;
@@ -41,15 +42,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btns.forEach((btn) => {
         btn.addEventListener("click", () => {
             if (btn.classList.contains("rgt")) {
-                console.log("right");
+                vids[vid_number - 1].classList.remove("active-vid");
                 indicator.classList.remove(`ind-${vid_number++}`);
                 if (vid_number > 3) vid_number = 1;
                 indicator.classList.add(`ind-${vid_number}`);
+                vids[vid_number - 1].classList.add("active-vid");
             } else if (btn.classList.contains("lft")) {
-                console.log("left");
+                vids[vid_number - 1].classList.remove("active-vid");
                 indicator.classList.remove(`ind-${vid_number--}`);
                 if (vid_number < 1) vid_number = 3;
                 indicator.classList.add(`ind-${vid_number}`);
+                vids[vid_number - 1].classList.add("active-vid");
             }
         });
     });
@@ -57,15 +60,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("keydown", (e) => {
         if (e.repeat) return;
         if (e.key === "ArrowRight") {
-            console.log("right");
+            vids[vid_number - 1].classList.remove("active-vid");
             indicator.classList.remove(`ind-${vid_number++}`);
             if (vid_number > 3) vid_number = 1;
             indicator.classList.add(`ind-${vid_number}`);
+            vids[vid_number - 1].classList.add("active-vid");
+
         } else if (e.key === "ArrowLeft") {
-            console.log("left");
+            vids[vid_number - 1].classList.remove("active-vid");
             indicator.classList.remove(`ind-${vid_number--}`);
             if (vid_number < 1) vid_number = 3;
             indicator.classList.add(`ind-${vid_number}`);
+            vids[vid_number - 1].classList.add("active-vid");
+
         }
     });
 
