@@ -16,6 +16,9 @@ export class Piece {
     this.flipped = false;
     this.sheetIndex = 0;
     this.el = this.build();
+    // Positioning happens here, not at the end of build(): place() reads this.el,
+    // which does not exist until build() has returned.
+    this.place(box.x, box.y, box.rot);
   }
 
   build() {
@@ -63,7 +66,6 @@ export class Piece {
       }
     });
 
-    this.place(this.box.x, this.box.y, this.box.rot);
     return el;
   }
 

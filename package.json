@@ -10,7 +10,7 @@
     "all": "npm run ingest && npm run build",
     "tag-eyes": "node scripts/tag-eyes.mjs source public/art",
     "placeholders": "node scripts/make-placeholders.mjs source 12",
-    "test": "node --test test/",
+    "test": "node --test test/*.mjs",
     "dev": "node scripts/serve.mjs"
   },
   "engines": {
@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "sharp": "^0.35.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }
