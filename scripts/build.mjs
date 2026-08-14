@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, rm, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, extname, basename } from 'node:path';
 
@@ -206,8 +206,17 @@ ${rows}
 }
 
 async function main() {
+  // A deploy may ship prebuilt art instead of the source images. Treat that as
+  // success rather than failing the build — the alternative is a CI failure on a
+  // repo that is in a perfectly valid state.
   if (!existsSync(SRC)) {
-    console.error(`source not found: ${SRC} — run \`npm run ingest\` first`);
+    if (existsSync(join(OUT, 'manifest.json'))) {
+      console.log(`no ${SRC}/ — using the prebuilt art already in ${OUT}/`);
+      return;
+    }
+    console.error(`source not found: ${SRC}`);
+    console.error('either commit source/ so this can build, or commit a prebuilt public/art/');
+    console.error('to generate source/ locally: npm run ingest');
     process.exit(1);
   }
 
@@ -247,13 +256,28 @@ async function main() {
         wips.push(await buildSheet(join(wipDir, w), wipId, OUT, { layers: 'light' }));
       }
 
+      // Timelapses live in source/video/ but must be served from the build output,
+      // or every piece back 404s in production. Copy rather than reference.
+      let timelapse = null;
+      if (m.timelapse) {
+        const from = join(SRC, m.timelapse);
+        if (existsSync(from)) {
+          await mkdir(join(OUT, 'video'), { recursive: true });
+          const name = basename(m.timelapse);
+          await copyFile(from, join(OUT, 'video', name));
+          timelapse = `art/video/${name}`;
+        } else {
+          console.warn(`  ${id}: timelapse missing at ${from}`);
+        }
+      }
+
       pieces.push({
         id,
         title: m.title || id,
         label: m.label || '',
         posted: m.posted ?? null,
         shortcode: m.shortcode ?? null,
-        timelapse: m.timelapse ?? null,
+        timelapse,
         // Optional, written by scripts/tag-eyes.mjs. Absent means no eye tracking.
         eyes: m.eyes ?? null,
         // Real WIP files win over the synthesised un-render when present.

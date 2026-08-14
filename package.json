@@ -13,11 +13,10 @@
     "test": "node --test test/",
     "dev": "node scripts/serve.mjs"
   },
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
-    "@vercel/kv": "^3.0.0"
-  },
-  "devDependencies": {
-    "sharp": "^0.34.0"
-  },
-  "engines": { "node": ">=20" }
+    "sharp": "^0.35.0"
+  }
 }

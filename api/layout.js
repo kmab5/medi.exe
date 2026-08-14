@@ -1,9 +1,9 @@
-// Per-visitor wall layout. Falls through to a 501 when KV is not configured, which
-// the client treats as "use localStorage" rather than as an error.
+// Per-visitor wall layout. Returns 501 when Redis is not configured, which the
+// client treats as "use localStorage" rather than as an error.
 
-import { kv } from '@vercel/kv';
+import { redis, parse, configured } from './_redis.js';
 
-const configured = () => Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 const visitorOf = (req) => {
   const raw = req.headers['x-visitor'];
@@ -14,29 +14,34 @@ const visitorOf = (req) => {
 };
 
 export default async function handler(req, res) {
-  if (!configured()) return res.status(501).json({ error: 'kv not configured' });
+  if (!configured()) return res.status(501).json({ error: 'redis not configured' });
 
   const visitor = visitorOf(req);
   if (!visitor) return res.status(400).json({ error: 'bad visitor id' });
 
   const key = `wall:layout:${visitor}`;
 
-  if (req.method === 'GET') {
-    const layout = await kv.get(key);
-    return res.status(200).json({ layout: layout ?? {} });
-  }
+  try {
+    if (req.method === 'GET') {
+      const layout = parse(await redis('GET', key), {});
+      return res.status(200).json({ layout: layout ?? {} });
+    }
 
-  if (req.method === 'POST') {
-    const { layout } = req.body ?? {};
-    if (!layout || typeof layout !== 'object' || Array.isArray(layout)) {
-      return res.status(400).json({ error: 'layout must be an object' });
+    if (req.method === 'POST') {
+      const { layout } = req.body ?? {};
+      if (!layout || typeof layout !== 'object' || Array.isArray(layout)) {
+        return res.status(400).json({ error: 'layout must be an object' });
+      }
+      // Bound the payload: a visitor cannot move more pieces than exist.
+      if (Object.keys(layout).length > 500) {
+        return res.status(413).json({ error: 'layout too large' });
+      }
+      await redis('SET', key, JSON.stringify(layout), 'EX', YEAR_SECONDS);
+      return res.status(200).json({ ok: true });
     }
-    // Bound the payload: a visitor cannot move more pieces than exist.
-    if (Object.keys(layout).length > 500) {
-      return res.status(413).json({ error: 'layout too large' });
-    }
-    await kv.set(key, layout, { ex: 60 * 60 * 24 * 365 });
-    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(502).json({ error: 'storage unavailable' });
   }
 
   res.setHeader('allow', 'GET, POST');

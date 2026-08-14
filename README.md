@@ -56,6 +56,9 @@ One flat image per piece goes in. The build step derives:
 | `cutout` | alpha-trim to content | the sticker sheet |
 | `thumb` | 72px | the minimap |
 
+Timelapse videos are copied from `source/video/` into the build output and their
+manifest paths rewritten, so the piece backs resolve in production.
+
 Two details that matter. Edges run over the *flat* map, not the original — shading
 gradients in the original produce phantom contours through the middle of a face, and
 quantising first removes them. And the flat map uses palette quantisation rather than
@@ -114,8 +117,13 @@ settles in finite time — a constant downward force does not.
 ## Persistence
 
 `/api/layout` stores where each visitor left the pieces. `/api/stickers` is the shared
-sticker layer. Both use Vercel KV and both return 501 when `KV_REST_API_URL` and
-`KV_REST_API_TOKEN` are absent, which the client treats as "use localStorage".
+sticker layer. Both talk to Redis over the Upstash REST protocol with no SDK — a
+twenty-line `fetch` wrapper in `api/_redis.js`, because `@vercel/kv` is deprecated and
+every Redis integration in the Vercel marketplace speaks the same protocol.
+
+They read either naming convention: `KV_REST_API_URL` / `KV_REST_API_TOKEN` or
+`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`. With neither set, both return
+501 and the client treats that as "use localStorage".
 
 So the wall works as a pure static deploy. You lose the shared sticker layer and
 nothing else.
@@ -135,11 +143,25 @@ physics stay, because both are user-initiated.
 
 ## Deploying
 
-Push to Vercel. `vercel.json` sets the build command and serves `public/`. Add the KV
-environment variables if you want the shared sticker layer.
+Push to Vercel. `vercel.json` sets the build command and serves `public/`.
 
-`source/` and `public/art/` are gitignored — the built art is derived, and the export
-is large. Run `npm run all` on a fresh clone.
+**`source/` is committed; `public/art/` is not.** The source images are the input the
+build needs, so they have to be in the repo for Vercel to build anything — an earlier
+version gitignored them and every deploy failed with "source not found". Everything
+under `public/art/` is derived and regenerated on each deploy, so committing it would
+just be churn.
+
+That keeps the promise intact: to add a drawing, drop a PNG in `source/`, commit, push.
+Vercel rebuilds.
+
+If you would rather not commit ~48MB of images, the build also accepts the opposite
+arrangement — commit a prebuilt `public/art/` instead and leave `source/` out, and the
+build step will detect the prebuilt manifest and skip. You lose the drop-a-PNG
+workflow.
+
+For the shared sticker layer, install a Redis integration from the Vercel marketplace
+and the environment variables are wired automatically. Without it the wall still works;
+stickers just stay local to each visitor.
 
 ## Known gaps
 
