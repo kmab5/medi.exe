@@ -1,0 +1,23 @@
+{
+  "name": "medi-wall",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An infinite wall of taped-up drawings.",
+  "scripts": {
+    "ingest": "node scripts/ingest.mjs export/tiredmedi source",
+    "build": "node scripts/build.mjs source public/art",
+    "all": "npm run ingest && npm run build",
+    "tag-eyes": "node scripts/tag-eyes.mjs source public/art",
+    "placeholders": "node scripts/make-placeholders.mjs source 12",
+    "test": "node --test test/",
+    "dev": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "@vercel/kv": "^3.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.0"
+  },
+  "engines": { "node": ">=20" }
+}

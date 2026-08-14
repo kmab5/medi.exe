@@ -1,0 +1,319 @@
+:root {
+  --paper: #f4f1e8;
+  --desk: #ded8c9;
+  --desk-deep: #cdc5b2;
+  --ink: #2a2723;
+  --ink-soft: #6a655c;
+  --tape: #e8dfa8;
+  --hud: rgba(250, 248, 242, 0.92);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--desk);
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+
+.defs { position: absolute; width: 0; height: 0; }
+
+/* The desk surface. A faint grid echoes the graph paper the artist draws on,
+   without competing with the work sitting on top of it. */
+#viewport {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(0,0,0,.035) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,0,0,.035) 39px 40px),
+    radial-gradient(circle at 30% 20%, #e6e0d1, var(--desk) 60%, var(--desk-deep));
+}
+#viewport.panning { cursor: grabbing; }
+
+#world {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+#margin-layer, #sticker-layer { position: absolute; top: 0; left: 0; }
+
+.margin-doodle {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: 50% 50%;
+  mix-blend-mode: multiply;
+  opacity: .5;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---- pieces ---- */
+
+.piece {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: 50% 4%;
+  cursor: grab;
+  touch-action: none;
+  perspective: 900px;
+}
+.piece.held { cursor: grabbing; z-index: 40; }
+.piece.open { z-index: 50; }
+.piece.offscreen .jit { animation: none; }
+.piece:focus-visible { outline: 2px solid #3a6ea8; outline-offset: 6px; }
+
+/* Stop-motion, not easing. steps(1) with a per-piece period is what makes the
+   wall read as handmade rather than as a website transition. */
+@keyframes jitter {
+  0%   { transform: rotate(calc(var(--jit-amp) * -1)) translate(0, 0); }
+  25%  { transform: rotate(calc(var(--jit-amp) * .6)) translate(.6px, -.6px); }
+  50%  { transform: rotate(calc(var(--jit-amp) * -.35)) translate(-.6px, .5px); }
+  75%  { transform: rotate(calc(var(--jit-amp) * .85)) translate(.3px, .4px); }
+  100% { transform: rotate(calc(var(--jit-amp) * -1)) translate(0, 0); }
+}
+
+.jit {
+  position: relative;
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transition: transform .45s cubic-bezier(.2,.8,.3,1);
+  animation: jitter var(--jit-dur) steps(1) var(--jit-delay) infinite;
+}
+.piece.held .jit, .piece.open .jit { animation-play-state: paused; }
+.piece.flipped .jit { transform: rotateY(180deg); }
+.piece.riffling .jit { transform: translateY(-6px) rotate(1.5deg); }
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  background: var(--paper);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 8px 18px rgba(0,0,0,.12);
+}
+.face.back {
+  transform: rotateY(180deg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 23px, rgba(0,0,0,.05) 23px 24px),
+    var(--paper);
+}
+
+.layers { position: absolute; inset: 0; overflow: hidden; border-radius: 2px; }
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.l-flat, .l-edge { opacity: 0; }
+.l-edge { background: var(--paper); }
+
+.piece.warped .layers {
+  filter: url(#wobble);
+  opacity: calc(1 - var(--warp) * .18);
+}
+
+.tape {
+  position: absolute;
+  top: -11px; left: 50%;
+  width: 74px; height: 22px;
+  margin-left: -37px;
+  background: var(--tape);
+  opacity: .8;
+  transform: rotate(var(--tape-skew));
+  z-index: 5;
+  box-shadow: 0 1px 1px rgba(0,0,0,.1);
+}
+.piece.held .tape { transform: rotate(var(--tape-skew)) scaleY(1.35); opacity: .6; }
+
+.stack-pip {
+  position: absolute;
+  right: 8px; bottom: 8px;
+  min-width: 24px; height: 24px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.9);
+  color: var(--ink);
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  z-index: 6;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+
+.wip-flag {
+  position: absolute;
+  left: 8px; bottom: 8px;
+  font-size: 11px;
+  padding: 2px 7px;
+  background: rgba(255,255,255,.9);
+  border-radius: 3px;
+  z-index: 6;
+}
+
+.eyes { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.eye {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+}
+.pupil {
+  width: 46%; height: 46%;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: transform .18s steps(2);
+}
+
+.back-title { margin: 0; font-size: 15px; }
+.back-label { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.back-media { flex: 1; min-height: 0; }
+.back-media video { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; }
+.back-cta { font-size: 13px; color: #8a4a2a; }
+
+/* ---- stickers ---- */
+
+.sticker, .sticker-ghost {
+  position: absolute;
+  top: 0; left: 0;
+  width: 130px;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.28));
+  user-select: none;
+  pointer-events: none;
+}
+.sticker-ghost {
+  position: fixed;
+  width: 90px;
+  transform: translate(-50%, -50%);
+  opacity: .85;
+  z-index: 200;
+}
+.sticker-choice {
+  width: 46px; height: 46px;
+  object-fit: contain;
+  cursor: grab;
+  background: rgba(255,255,255,.5);
+  border-radius: 4px;
+  touch-action: none;
+}
+
+/* ---- chrome ---- */
+
+.hud {
+  position: fixed;
+  z-index: 100;
+  background: var(--hud);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+.hud-top { top: 16px; left: 16px; }
+.hud-top h1 { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: .01em; }
+.hud-top .sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+
+.hud-scrub {
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  width: min(440px, calc(100vw - 32px));
+}
+.hud-scrub input { flex: 1; accent-color: #8a4a2a; }
+#scrub-label { min-width: 92px; color: var(--ink-soft); }
+
+.hud-side { top: 16px; right: 16px; width: 178px; }
+#minimap {
+  position: relative;
+  width: 150px;
+  background: rgba(0,0,0,.05);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.mm-dot { position: absolute; opacity: .85; }
+.mm-view {
+  position: absolute;
+  border: 1.5px solid #8a4a2a;
+  background: rgba(138,74,42,.1);
+  pointer-events: none;
+}
+.sheet-title { margin: 12px 0 6px; font-size: 12px; color: var(--ink-soft); }
+#sticker-sheet { display: flex; flex-wrap: wrap; gap: 4px; max-height: 160px; overflow-y: auto; }
+
+.hud-actions {
+  bottom: 16px; left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.hud-actions button, .hud-actions a {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.hud-caption {
+  bottom: 76px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  text-align: center;
+  max-width: min(520px, calc(100vw - 32px));
+}
+body.focused .hud-caption { opacity: 1; transform: translateX(-50%) translateY(0); }
+.cap-title { margin: 0; font-size: 15px; }
+.cap-meta { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+.cap-hint { margin: 6px 0 0; font-size: 11px; color: var(--ink-soft); }
+
+.fallback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--desk);
+  z-index: 300;
+  text-align: center;
+  padding: 24px;
+}
+.failed-only { display: none; }
+body.failed .failed-only { display: grid; }
+
+@media (max-width: 720px) {
+  .hud-side { display: none; }
+  .hud-top .sub { display: none; }
+  .hud-actions { flex-direction: row; gap: 14px; bottom: 64px; }
+  .hud-scrub { bottom: 12px; }
+  .hud-caption { bottom: 118px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jit { animation: none; }
+  .pupil { transition: none; }
+  .face, .jit { transition-duration: .01ms; }
+}

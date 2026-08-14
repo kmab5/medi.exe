@@ -1,2 +1,6 @@
-.hintrc
-.vscode/
+node_modules/
+export/
+source/
+public/art/
+public/list.html
+.vercel

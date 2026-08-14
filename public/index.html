@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>medi — the wall</title>
+<meta name="description" content="Illustration by medi. Drawings taped to a wall you can pull apart.">
+<meta property="og:title" content="medi — the wall">
+<meta property="og:description" content="Illustration by medi. Drawings taped to a wall you can pull apart.">
+<link rel="stylesheet" href="css/wall.css">
+</head>
+<body>
+
+<svg class="defs" aria-hidden="true" focusable="false">
+  <filter id="wobble" x="-8%" y="-8%" width="116%" height="116%">
+    <!-- The underdrawing stage. Turbulence drives a displacement map, so lines go
+         uncertain the way a rough pencil pass does, rather than simply blurring. -->
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.021" numOctaves="2" seed="7" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<div id="viewport">
+  <div id="world">
+    <div id="margin-layer"></div>
+    <div id="sticker-layer"></div>
+  </div>
+</div>
+
+<header class="hud hud-top">
+  <h1>medi</h1>
+  <p class="sub"><span id="count">—</span> pieces, taped to a wall. drag them. throw them.</p>
+</header>
+
+<div class="hud hud-scrub">
+  <label for="scrub">un-render</label>
+  <input id="scrub" type="range" min="0" max="1000" value="1000" step="1" aria-describedby="scrub-label">
+  <span id="scrub-label">finished</span>
+</div>
+
+<aside class="hud hud-side">
+  <div id="minimap" aria-hidden="true"></div>
+  <div class="sheet-wrap">
+    <p class="sheet-title">stickers — drag onto the wall</p>
+    <div id="sticker-sheet"></div>
+  </div>
+</aside>
+
+<nav class="hud hud-actions">
+  <button id="shuffle" type="button">lose me somewhere</button>
+  <button id="reset" type="button">see it all</button>
+  <button id="sound-toggle" type="button" aria-pressed="false">sound off</button>
+  <a href="list.html">plain list</a>
+</nav>
+
+<div id="caption" class="hud hud-caption" role="status">
+  <p class="cap-title"></p>
+  <p class="cap-meta"></p>
+  <p class="cap-hint">shift-click or double-click to turn it over · esc to step back</p>
+</div>
+
+<noscript>
+  <div class="fallback">
+    <p>The wall needs JavaScript. The <a href="list.html">plain list</a> has every piece.</p>
+  </div>
+</noscript>
+
+<div class="fallback failed-only">
+  <p>Something broke loading the wall. The <a href="list.html">plain list</a> still works.</p>
+</div>
+
+<script type="module" src="js/wall.js"></script>
+</body>
+</html>
