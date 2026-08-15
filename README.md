@@ -116,18 +116,33 @@ Entirely optional — untagged pieces simply don't have eyes.
 
 ## /medi-login
 
-An unlisted page for adding work without touching the repo directly. Upload one
-image, several for an album, or a video; it commits to GitHub, which triggers a
-Vercel rebuild, and the piece appears on the wall a minute or two later.
+An unlisted page with two jobs: adding work, and rewriting the notes. Both commit to
+GitHub, which triggers a Vercel rebuild, so changes appear on the wall a minute or
+two later.
+
+Reachable at `/medi-login` because `vercel.json` sets `cleanUrls`. Without it Vercel
+only serves `/medi-login.html` and the clean path 404s.
 
 Environment variables:
 
 | Variable | Purpose |
 |---|---|
-| `MEDI_PASSWORD` | The only thing gating write access. Minimum 12 characters — the endpoint refuses to run below that. |
+| `MEDI_PASSWORD` | The only thing gating write access. Minimum 12 characters — the endpoints refuse to run below that. |
 | `GITHUB_TOKEN` | Fine-grained token with **contents: read and write** on this repo only. |
-| `GITHUB_REPO` | `owner/name` |
+| `GITHUB_REPO` | `owner/name`. A clone URL is accepted too and normalised. |
 | `GITHUB_BRANCH` | Defaults to `main` |
+
+### Editing notes
+
+The notes tab loads `content/notes.json` from the repo, edits it as a form —
+title, paper stock, paragraphs, links, reordering — and commits it back. Because that
+file is the single source, a save changes both the notes on the wall and the notes
+page.
+
+Validation runs on the server as well as in the browser: titles are required, ids
+must not collide, and link hrefs must be http, https or mailto. The browser is a
+convenience; the endpoint is the boundary, and it holds a token that can write to the
+repository.
 
 Files upload one per request because a serverless body caps out near 4.5MB and an
 album exceeds that in total. Each request creates a GitHub blob and returns its sha;
@@ -186,8 +201,12 @@ twenty-line `fetch` wrapper in `api/_redis.js`, because `@vercel/kv` is deprecat
 every Redis integration in the Vercel marketplace speaks the same protocol.
 
 They read either naming convention: `KV_REST_API_URL` / `KV_REST_API_TOKEN` or
-`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`. With neither set, both return
-501 and the client treats that as "use localStorage".
+`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
+
+With neither set they answer **200** with `configured: false`, and the client falls
+back to localStorage. They used to answer 501, which is arguably more correct but
+filled the deploy logs with errors that needed no action — an unconfigured store is a
+valid state, not a failure.
 
 So the wall works as a pure static deploy. You lose the shared sticker layer and
 nothing else.

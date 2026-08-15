@@ -26,12 +26,22 @@ createServer(async (req, res) => {
   const rel = normalize(url === '/' ? '/index.html' : url).replace(/^(\.\.[/\\])+/, '');
   const path = join(ROOT, rel);
 
-  try {
-    const data = await readFile(path);
-    res.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream' });
-    res.end(data);
-  } catch {
-    res.writeHead(404, { 'content-type': 'text/plain' });
-    res.end('not found');
+  // Vercel is configured with cleanUrls, so /notes serves notes.html. Mirror that
+  // here or local and production disagree about every link.
+  const candidates = extname(path) ? [path] : [path, `${path}.html`];
+
+  for (const candidate of candidates) {
+    try {
+      const data = await readFile(candidate);
+      res.writeHead(200, {
+        'content-type': TYPES[extname(candidate)] ?? 'application/octet-stream',
+      });
+      return res.end(data);
+    } catch {
+      // try the next candidate
+    }
   }
+
+  res.writeHead(404, { 'content-type': 'text/plain' });
+  res.end('not found');
 }).listen(PORT, () => console.log(`wall at http://localhost:${PORT}`));

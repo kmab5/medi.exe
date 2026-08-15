@@ -1,11 +1,19 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "public",
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/art/(.*)",
       "headers": [
         { "key": "cache-control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/medi-login",
+      "headers": [
+        { "key": "x-robots-tag", "value": "noindex, nofollow" },
+        { "key": "cache-control", "value": "no-store" }
       ]
     }
   ]

@@ -14,7 +14,12 @@ const visitorOf = (req) => {
 };
 
 export default async function handler(req, res) {
-  if (!configured()) return res.status(501).json({ error: 'redis not configured' });
+  // No Redis is a valid configuration, not a failure: the wall falls back to
+  // localStorage and works fine. Answering 200 with an explicit flag says so
+  // without filling the logs with errors that need no action.
+  if (!configured()) {
+    return res.status(200).json({ storage: 'local', configured: false, layout: {} });
+  }
 
   const visitor = visitorOf(req);
   if (!visitor) return res.status(400).json({ error: 'bad visitor id' });

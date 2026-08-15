@@ -38,15 +38,39 @@
   .ok { color:#2a6a3a; }
   .bar { height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:16px; }
   .bar span { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
+  .tabs { display:flex; gap:4px; margin:30px 0 4px; border-bottom:1px solid var(--line); }
+  .tab { margin:0; padding:9px 15px; background:none; color:var(--soft); border-radius:4px 4px 0 0;
+         border-bottom:2px solid transparent; font-size:14px; }
+  .tab.on { color:var(--ink); border-bottom-color:var(--accent); }
+  .hint { font-size:13px; color:var(--soft); margin:22px 0 4px; }
+  code { font:12.5px ui-monospace, Menlo, monospace; background:#efeadf; padding:1px 5px; border-radius:3px; }
+  .ghost { background:none; color:var(--ink); border:1px solid var(--line); margin-right:8px; }
+  .note-card { border:1px solid var(--line); border-radius:6px; padding:16px 18px; margin-top:16px;
+               background:#fbf9f4; }
+  .note-card .row { display:flex; gap:10px; align-items:center; }
+  .note-card .row select { padding:8px; font:inherit; border:1px solid var(--line); border-radius:4px;
+                           background:#fff; }
+  .note-card label { margin-top:14px; }
+  .note-card .del { background:none; color:#a33; border:0; margin:0; padding:4px 6px; font-size:13px; }
+  .note-card .mv { background:none; color:var(--soft); border:0; margin:0; padding:4px 6px; }
+  .note-card textarea.body { min-height:120px; }
+  .note-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>upload</h1>
-  <p class="lede">Adds a piece to the wall. Commits to the repo, which redeploys automatically. Give it a minute or two to appear.</p>
+  <h1>medi</h1>
+  <p class="lede">Add work, or rewrite the notes. Both commit to the repo, which redeploys automatically — give it a minute or two to appear.</p>
 
   <label for="key">password</label>
   <input id="key" type="password" autocomplete="current-password" spellcheck="false">
+
+  <div class="tabs" role="tablist">
+    <button id="tab-art" class="tab on" role="tab" aria-selected="true">add a piece</button>
+    <button id="tab-notes" class="tab" role="tab" aria-selected="false">edit notes</button>
+  </div>
+
+<section id="panel-art">
 
   <label for="title">title</label>
   <input id="title" type="text" placeholder="what this is called">
@@ -63,6 +87,16 @@
 
   <div class="bar"><span id="bar"></span></div>
   <button id="go" disabled>upload</button>
+</section>
+
+<section id="panel-notes" hidden>
+  <p class="hint">These are the notes pinned to the wall and shown on the notes page. Blank lines separate paragraphs. Links are one per line as <code>label | https://…</code></p>
+  <button id="load-notes" class="ghost">load current notes</button>
+  <div id="notes"></div>
+  <button id="add-note" class="ghost" hidden>add a note</button>
+  <button id="save-notes" hidden>save notes</button>
+</section>
+
   <div id="log"></div>
 </div>
 
@@ -232,6 +266,145 @@ $('go').addEventListener('click', async () => {
     $('go').disabled = false;
   }
 });
+
+/* ---- notes editor ---- */
+
+const KINDS = ['note', 'index', 'sticky', 'receipt'];
+let notes = [];
+
+const showTab = (which) => {
+  const art = which === 'art';
+  $('panel-art').hidden = !art;
+  $('panel-notes').hidden = art;
+  $('tab-art').classList.toggle('on', art);
+  $('tab-notes').classList.toggle('on', !art);
+  $('tab-art').setAttribute('aria-selected', String(art));
+  $('tab-notes').setAttribute('aria-selected', String(!art));
+};
+$('tab-art').addEventListener('click', () => showTab('art'));
+$('tab-notes').addEventListener('click', () => showTab('notes'));
+
+// Paragraphs are edited as one textarea split on blank lines, which is how people
+// actually write, rather than as a list of separate fields.
+const bodyToText = (body) => (body ?? []).join('\n\n');
+const textToBody = (text) => String(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+const linksToText = (links) => (links ?? []).map((l) => `${l.label} | ${l.href}`).join('\n');
+const textToLinks = (text) => String(text).split('\n').map((line) => {
+  const i = line.indexOf('|');
+  if (i < 0) return null;
+  const label = line.slice(0, i).trim();
+  const href = line.slice(i + 1).trim();
+  return label && href ? { label, href } : null;
+}).filter(Boolean);
+
+function renderNotes() {
+  const host = $('notes');
+  host.innerHTML = '';
+
+  notes.forEach((note, i) => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+
+    const kinds = KINDS.map((k) =>
+      `<option value="${k}"${k === (note.kind ?? 'note') ? ' selected' : ''}>${k}</option>`).join('');
+
+    card.innerHTML = `
+      <div class="note-head">
+        <div class="row" style="flex:1">
+          <input type="text" class="title" value="" placeholder="title">
+          <select class="kind">${kinds}</select>
+        </div>
+        <div>
+          <button class="mv up" title="move up">↑</button>
+          <button class="mv down" title="move down">↓</button>
+          <button class="del">remove</button>
+        </div>
+      </div>
+      <label>body — blank line between paragraphs</label>
+      <textarea class="body"></textarea>
+      <label>links — one per line, <code>label | https://…</code></label>
+      <textarea class="links" style="min-height:56px"></textarea>`;
+
+    // Values are assigned rather than interpolated so a quote or angle bracket in
+    // Medi's writing cannot break out of the markup.
+    card.querySelector('.title').value = note.title ?? '';
+    card.querySelector('.body').value = bodyToText(note.body);
+    card.querySelector('.links').value = linksToText(note.links);
+
+    const sync = () => {
+      note.title = card.querySelector('.title').value;
+      note.kind = card.querySelector('.kind').value;
+      note.body = textToBody(card.querySelector('.body').value);
+      note.links = textToLinks(card.querySelector('.links').value);
+    };
+    for (const el of card.querySelectorAll('input, textarea, select')) {
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
+    }
+
+    card.querySelector('.del').addEventListener('click', () => {
+      notes.splice(i, 1);
+      renderNotes();
+    });
+    card.querySelector('.up').addEventListener('click', () => {
+      if (i === 0) return;
+      [notes[i - 1], notes[i]] = [notes[i], notes[i - 1]];
+      renderNotes();
+    });
+    card.querySelector('.down').addEventListener('click', () => {
+      if (i === notes.length - 1) return;
+      [notes[i + 1], notes[i]] = [notes[i], notes[i + 1]];
+      renderNotes();
+    });
+
+    host.appendChild(card);
+  });
+
+  $('add-note').hidden = false;
+  $('save-notes').hidden = false;
+}
+
+$('load-notes').addEventListener('click', async () => {
+  $('log').innerHTML = '';
+  try {
+    if (!$('key').value) throw new Error('password first');
+    const res = await fetch('/api/notes', { headers: { 'x-medi-key': $('key').value } });
+    const json = await res.json().catch(() => ({ error: `http ${res.status}` }));
+    if (!res.ok) throw new Error(json.error ?? `http ${res.status}`);
+    notes = json.notes ?? [];
+    renderNotes();
+    log(`loaded ${notes.length} notes`, 'ok');
+  } catch (err) {
+    log(err.message, 'err');
+  }
+});
+
+$('add-note').addEventListener('click', () => {
+  notes.push({ id: '', kind: 'note', title: '', body: [], links: [] });
+  renderNotes();
+});
+
+$('save-notes').addEventListener('click', async () => {
+  $('log').innerHTML = '';
+  $('save-notes').disabled = true;
+  try {
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-medi-key': $('key').value },
+      body: JSON.stringify({ notes }),
+    });
+    const json = await res.json().catch(() => ({ error: `http ${res.status}` }));
+    if (!res.ok) throw new Error(json.error ?? `http ${res.status}`);
+    log(`saved ${json.count} notes as ${json.commit.slice(0, 7)}`, 'ok');
+    log('Vercel is rebuilding.', 'ok');
+  } catch (err) {
+    log(err.message, 'err');
+  } finally {
+    $('save-notes').disabled = false;
+  }
+});
+
 </script>
 </body>
 </html>

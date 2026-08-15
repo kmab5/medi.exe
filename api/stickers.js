@@ -7,7 +7,10 @@ const KEY = 'wall:stickers:shared';
 const MAX = 4000;
 
 export default async function handler(req, res) {
-  if (!configured()) return res.status(501).json({ error: 'redis not configured' });
+  // Not configured is a valid state, not an error — see api/layout.js.
+  if (!configured()) {
+    return res.status(200).json({ storage: 'local', configured: false, stickers: [] });
+  }
 
   try {
     if (req.method === 'GET') {

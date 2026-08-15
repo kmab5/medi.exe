@@ -5,34 +5,16 @@
 // commit triggers a Vercel rebuild, which runs the pipeline and the new piece
 // appears on the wall.
 //
-// Authentication is a single shared password in MEDI_PASSWORD. That is proportionate
-// for a one-person publishing tool, but it is the only thing standing between the
-// internet and write access to the repo, so it is compared in constant time and the
-// endpoint refuses to run at all if the password is unset or trivially short.
+// Authentication is the shared password guard in ./_auth.js.
 
-import { timingSafeEqual } from 'node:crypto';
 import { createBlob, commitFiles, readJsonFile, configured } from './_github.js';
+import { guard } from './_auth.js';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_SHEETS = 12;
-const MIN_PASSWORD = 12;
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
-
-function authorised(req) {
-  const expected = process.env.MEDI_PASSWORD;
-  if (!expected || expected.length < MIN_PASSWORD) return false;
-
-  const given = req.headers['x-medi-key'];
-  if (typeof given !== 'string') return false;
-
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  // timingSafeEqual throws on length mismatch, which would itself leak length.
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
 
 const slug = (s) => String(s ?? '')
   .toLowerCase()
@@ -54,16 +36,7 @@ export default async function handler(req, res) {
     res.setHeader('allow', 'POST');
     return res.status(405).end();
   }
-  if (!configured()) {
-    return res.status(501).json({ error: 'github not configured — set GITHUB_TOKEN and GITHUB_REPO' });
-  }
-  if (!process.env.MEDI_PASSWORD || process.env.MEDI_PASSWORD.length < MIN_PASSWORD) {
-    return res.status(503).json({ error: `set MEDI_PASSWORD to at least ${MIN_PASSWORD} characters` });
-  }
-  if (!authorised(req)) {
-    // Deliberately vague, and identical for a wrong password and a missing one.
-    return res.status(401).json({ error: 'nope' });
-  }
+  if (!guard(req, res, { githubConfigured: configured() })) return;
 
   const { action } = req.body ?? {};
 

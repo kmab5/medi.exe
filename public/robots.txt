@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: /medi-login
 Disallow: /medi-login.html
 Disallow: /api/
 

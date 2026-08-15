@@ -25,8 +25,15 @@ async function api(path, options) {
       headers: { 'content-type': 'application/json', 'x-visitor': visitorId() },
     });
     if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    // The endpoint answers 200 with configured:false when no shared store is set
+    // up. Treat that as "there is no API" so we stop asking on every save.
+    if (json.configured === false) {
+      apiAvailable = false;
+      throw new Error('storage not configured');
+    }
     apiAvailable = true;
-    return await res.json();
+    return json;
   } catch (err) {
     apiAvailable = false;
     throw err;

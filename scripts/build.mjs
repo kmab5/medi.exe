@@ -212,7 +212,7 @@ async function writeListPage(pieces, dest) {
 </head>
 <body>
 <h1>medi</h1>
-<p class="lede">${pieces.length} pieces. <a href="index.html">the wall</a> is the same work, but you can throw it around. <a href="notes.html">notes</a> is where the writing is.</p>
+<p class="lede">${pieces.length} pieces. <a href="/">the wall</a> is the same work, but you can throw it around. <a href="/notes">notes</a> is where the writing is.</p>
 <ul>
 ${rows}
 </ul>
@@ -285,8 +285,8 @@ ${links}
   <h1>medi</h1>
   <p class="lede">Notes, in the order I think they matter.</p>
   <nav>
-    <a href="index.html">the wall</a>
-    <a href="list.html">every piece</a>
+    <a href="/">the wall</a>
+    <a href="/list">every piece</a>
     <a href="https://www.instagram.com/tiredmedi/" rel="noopener">instagram</a>
   </nav>
 </header>

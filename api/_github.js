@@ -11,7 +11,19 @@
 
 const API = 'https://api.github.com';
 
-const repo = () => process.env.GITHUB_REPO;
+// GITHUB_REPO wants `owner/name`, but the obvious thing to paste from GitHub is the
+// clone URL. Accept either rather than failing with a confusing 404 from the API —
+// a token that lacks permission and a malformed repo string produce the same status,
+// which makes the mistake very hard to diagnose from the outside.
+export function normaliseRepo(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim().replace(/\.git$/, '').replace(/\/+$/, '');
+  const fromUrl = trimmed.match(/github\.com[/:]([^/]+\/[^/]+)$/);
+  const slug = fromUrl ? fromUrl[1] : trimmed;
+  return /^[\w.-]+\/[\w.-]+$/.test(slug) ? slug : null;
+}
+
+const repo = () => normaliseRepo(process.env.GITHUB_REPO);
 const branch = () => process.env.GITHUB_BRANCH || 'main';
 const token = () => process.env.GITHUB_TOKEN;
 
