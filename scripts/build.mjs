@@ -138,6 +138,23 @@ async function buildSheet(srcPath, id, outDir, { layers = 'full' } = {}) {
   return out;
 }
 
+// Notes are written by hand in content/notes.json. They are content, not derived
+// assets, so the build only validates and passes them through.
+async function loadNotes() {
+  const path = 'content/notes.json';
+  if (!existsSync(path)) return [];
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8'));
+    const notes = (parsed.notes ?? []).filter((n) => n && n.id && n.title);
+    const dropped = (parsed.notes ?? []).length - notes.length;
+    if (dropped) console.warn(`  ${dropped} note(s) missing id or title, skipped`);
+    return notes;
+  } catch (err) {
+    console.warn(`  notes.json unparseable, skipping: ${err.message}`);
+    return [];
+  }
+}
+
 async function loadMeta() {
   const path = join(SRC, 'meta.json');
   if (!existsSync(path)) return {};
@@ -195,10 +212,87 @@ async function writeListPage(pieces, dest) {
 </head>
 <body>
 <h1>medi</h1>
-<p class="lede">${pieces.length} pieces. <a href="index.html">the wall</a> is the same work, but you can throw it around.</p>
+<p class="lede">${pieces.length} pieces. <a href="index.html">the wall</a> is the same work, but you can throw it around. <a href="notes.html">notes</a> is where the writing is.</p>
 <ul>
 ${rows}
 </ul>
+</body>
+</html>
+`;
+  await writeFile(dest, html);
+}
+
+// The written notes as a page. "Plain" here means no canvas, no physics, no
+// dragging — not undesigned. This is where the writing is easiest to actually read,
+// and it is what a search engine indexes, so it gets real typography.
+async function writeNotesPage(notes, dest) {
+  const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const sections = notes.map((n) => {
+    const body = (n.body ?? []).map((para) => `      <p>${esc(para)}</p>`).join('\n');
+    const links = (n.links ?? []).length
+      ? `      <p class="links">${n.links.map((l) =>
+          `<a href="${esc(l.href)}" rel="noopener">${esc(l.label)}</a>`).join('')}</p>`
+      : '';
+    return `    <section class="n kind-${esc(n.kind ?? 'note')}" id="${esc(n.id)}">
+      <h2>${esc(n.title)}</h2>
+${body}
+${links}
+    </section>`;
+  }).join('\n');
+
+  const updated = new Date().toLocaleDateString('en-GB', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>medi — notes</title>
+<meta name="description" content="Notes, commissions and process, written by medi.">
+<style>
+  :root { --paper:#f4f1e8; --ink:#2a2723; --soft:#6a655c; --accent:#8a4a2a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+         font:17px/1.68 ui-serif, Georgia, "Times New Roman", serif; }
+  .wrap { max-width:44rem; margin:0 auto; padding:72px 24px 96px; }
+  header { margin-bottom:64px; }
+  h1 { font-size:30px; font-weight:500; margin:0 0 6px; letter-spacing:-.01em; }
+  .lede { margin:0; color:var(--soft); font-size:16px; }
+  nav { margin-top:20px; display:flex; gap:20px; flex-wrap:wrap;
+        font:14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  .n { margin:0 0 60px; padding-left:22px; border-left:2px solid rgba(0,0,0,.09); }
+  .n h2 { font-size:20px; font-weight:500; margin:0 0 14px; letter-spacing:-.01em; }
+  .n p { margin:0 0 14px; }
+  .n .links { display:flex; gap:20px; flex-wrap:wrap;
+              font:14px/1.5 ui-sans-serif, system-ui, sans-serif; margin-top:20px; }
+  .kind-sticky { border-left-color:#d9c766; }
+  .kind-index { border-left-color:rgba(70,110,150,.45); }
+  .kind-receipt { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:14.5px;
+                  border-left-color:rgba(0,0,0,.18); }
+  a { color:var(--accent); text-underline-offset:3px; }
+  footer { margin-top:80px; padding-top:24px; border-top:1px solid rgba(0,0,0,.1);
+           color:var(--soft); font:14px/1.6 ui-sans-serif, system-ui, sans-serif; }
+  @media (max-width:600px) { .wrap { padding:44px 20px 72px; } h1 { font-size:26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>medi</h1>
+  <p class="lede">Notes, in the order I think they matter.</p>
+  <nav>
+    <a href="index.html">the wall</a>
+    <a href="list.html">every piece</a>
+    <a href="https://www.instagram.com/tiredmedi/" rel="noopener">instagram</a>
+  </nav>
+</header>
+${sections}
+<footer>Last built ${updated}.</footer>
+</div>
 </body>
 </html>
 `;
@@ -256,20 +350,27 @@ async function main() {
         wips.push(await buildSheet(join(wipDir, w), wipId, OUT, { layers: 'light' }));
       }
 
-      // Timelapses live in source/video/ but must be served from the build output,
-      // or every piece back 404s in production. Copy rather than reference.
-      let timelapse = null;
-      if (m.timelapse) {
-        const from = join(SRC, m.timelapse);
-        if (existsSync(from)) {
-          await mkdir(join(OUT, 'video'), { recursive: true });
-          const name = basename(m.timelapse);
-          await copyFile(from, join(OUT, 'video', name));
-          timelapse = `art/video/${name}`;
-        } else {
-          console.warn(`  ${id}: timelapse missing at ${from}`);
+      // Video lives in source/video/ but must be served from the build output, or
+      // every piece back 404s in production. Copy rather than reference.
+      //
+      // Two clips per piece: `preview` is the small silent loop that plays on the
+      // wall face, `timelapse` is the full-quality process video on the back. If
+      // ingest could not make a preview, the full clip stands in.
+      const copyVideo = async (rel) => {
+        if (!rel) return null;
+        const from = join(SRC, rel);
+        if (!existsSync(from)) {
+          console.warn(`  ${id}: video missing at ${from}`);
+          return null;
         }
-      }
+        await mkdir(join(OUT, 'video'), { recursive: true });
+        const name = basename(rel);
+        await copyFile(from, join(OUT, 'video', name));
+        return `art/video/${name}`;
+      };
+
+      const timelapse = await copyVideo(m.timelapse);
+      const preview = (await copyVideo(m.preview)) ?? timelapse;
 
       pieces.push({
         id,
@@ -278,6 +379,7 @@ async function main() {
         posted: m.posted ?? null,
         shortcode: m.shortcode ?? null,
         timelapse,
+        preview,
         // Optional, written by scripts/tag-eyes.mjs. Absent means no eye tracking.
         eyes: m.eyes ?? null,
         // Real WIP files win over the synthesised un-render when present.
@@ -307,17 +409,21 @@ async function main() {
 
   pieces.sort((a, b) => String(a.posted).localeCompare(String(b.posted)));
 
+  const notes = await loadNotes();
+
   const manifest = {
     generated: new Date().toISOString(),
     count: pieces.length,
     pieces,
     margin,
+    notes,
   };
   await writeFile(join(OUT, 'manifest.json'), JSON.stringify(manifest));
   await writeListPage(pieces, join(OUT, '..', 'list.html'));
+  await writeNotesPage(notes, join(OUT, '..', 'notes.html'));
 
   const withDates = pieces.filter((p) => p.posted).length;
-  console.log(`\n${pieces.length} pieces, ${margin.length} margin, ${withDates} dated`);
+  console.log(`\n${pieces.length} pieces, ${margin.length} margin, ${notes.length} notes, ${withDates} dated`);
   console.log(`wrote ${OUT}/manifest.json`);
 }
 

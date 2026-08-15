@@ -28,11 +28,25 @@ export class Piece {
     el.dataset.id = this.data.id;
     el.style.width = `${this.box.w}px`;
     el.style.height = `${this.box.h}px`;
-    // Per-piece jitter phase and period, seeded from the id so it is stable across
-    // reloads but no two pieces are ever in step with each other.
-    el.style.setProperty('--jit-dur', `${(0.42 + rand() * 0.5).toFixed(2)}s`);
-    el.style.setProperty('--jit-delay', `${(-rand() * 2).toFixed(2)}s`);
-    el.style.setProperty('--jit-amp', `${(0.3 + rand() * 0.55).toFixed(2)}deg`);
+
+    // Movement personality, chosen by seed so it is stable across reloads but
+    // unevenly distributed across the wall. Weighted: sway and flutter are the
+    // most legible, shrug is rationed because a wall of things lurching at once
+    // is noise rather than life.
+    const MOVES = ['m-sway', 'm-sway', 'm-flutter', 'm-flutter', 'm-bob', 'm-lean', 'm-shrug'];
+    this.move = MOVES[Math.floor(rand() * MOVES.length)];
+    el.classList.add(this.move);
+
+    // Amplitude and period vary per piece and per personality. Sway and lean read
+    // as gravity so they run slow and wide; flutter is fast and small.
+    const slow = this.move === 'm-sway' || this.move === 'm-lean';
+    const wide = this.move === 'm-flutter' ? 0.55 : 1;
+    el.style.setProperty('--amp', `${(1.4 + rand() * 2.4 * wide).toFixed(2)}deg`);
+    el.style.setProperty('--x', `${(2 + rand() * 7).toFixed(1)}px`);
+    el.style.setProperty('--y', `${(2 + rand() * 6).toFixed(1)}px`);
+    el.style.setProperty('--dur', `${(slow ? 2.2 + rand() * 4.5 : 0.5 + rand() * 1.9).toFixed(2)}s`);
+    // Negative delay starts every piece mid-cycle, so nothing is ever in step.
+    el.style.setProperty('--delay', `${(-rand() * 8).toFixed(2)}s`);
     el.style.setProperty('--tape-skew', `${((rand() - 0.5) * 16).toFixed(1)}deg`);
 
     el.innerHTML = `
@@ -105,6 +119,22 @@ export class Piece {
     this.flatImg = add('flat', 'l-flat');
     this.edgeImg = add('edge', 'l-edge');
 
+    // A piece whose source was a video gets its preview loop on the face, sitting
+    // above the still. It is created but never loaded until asked to play, so the
+    // bytes are only spent on pieces someone actually looks at.
+    if (this.data.preview) {
+      const v = document.createElement('video');
+      v.className = 'layer l-preview';
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.preload = 'none';
+      v.setAttribute('aria-hidden', 'true');
+      this.layersEl.appendChild(v);
+      this.previewVideo = v;
+      this.el.classList.add('has-video');
+    }
+
     if (this.data.eyes) this.buildEyes();
     this.fillBack();
   }
@@ -170,9 +200,36 @@ export class Piece {
     if (this.flatImg) this.flatImg.style.opacity = String(clamp01(2 - s));
     if (this.edgeImg) this.edgeImg.style.opacity = String(clamp01(1 - s));
 
+    // Scrubbing away from finished hides the preview — an un-rendered piece
+    // playing a fully rendered video would contradict itself.
+    const scrubbed = t < 0.97;
+    if (scrubbed !== this.scrubbed) {
+      this.scrubbed = scrubbed;
+      if (scrubbed) this.setPreviewPlaying(false);
+      this.el.classList.toggle('scrubbing', scrubbed);
+    }
+
     const warp = clamp01(1 - s * 1.5);
     this.el.classList.toggle('warped', warp > 0.02);
     this.el.style.setProperty('--warp', warp.toFixed(3));
+  }
+
+  // Play budget is managed by the wall: only a handful of previews run at once.
+  // The source is attached on first play rather than at construction so that a
+  // preview which is never seen is never fetched.
+  setPreviewPlaying(on) {
+    const v = this.previewVideo;
+    if (!v || this.scrubbed) return;
+    if (on) {
+      if (!v.src) {
+        v.src = this.data.preview;
+        v.load();
+      }
+      v.play().then(() => this.el.classList.add('previewing')).catch(() => {});
+    } else {
+      v.pause();
+      this.el.classList.remove('previewing');
+    }
   }
 
   flip() {

@@ -13,6 +13,12 @@
 // many pieces are in flight.
 
 const SLIDE_FRICTION = 0.93;
+// Weak pull back toward where a piece belongs. Ambient disturbance nudges pieces
+// constantly, and without a tether those nudges random-walk the wall apart over a
+// long session. Deliberate placements re-home the piece, so this only ever undoes
+// drift the visitor did not ask for.
+const HOME_PULL = 0.004;
+const HOME_SLACK = 1.5;
 const RELEASE_WEIGHT = 4;
 const SPIN_DECAY = 0.95;
 const LANDING_SPEED = 0.6;
@@ -25,6 +31,8 @@ export class Body {
     this.piece = piece;
     this.x = x;
     this.y = y;
+    this.homeX = x;
+    this.homeY = y;
     this.rot = rot;
     this.restRot = rot;
     this.vx = 0;
@@ -51,6 +59,9 @@ export class Body {
     this.held = false;
     this.vx = vx;
     this.vy = vy;
+    // Wherever the visitor let go is where this piece now lives.
+    this.homeX = this.x;
+    this.homeY = this.y;
     const speed = Math.hypot(vx, vy);
     if (speed > 9) {
       this.free = true;
@@ -78,6 +89,8 @@ export class Body {
       if (Math.hypot(this.vx, this.vy) < LANDING_SPEED) {
         this.free = false;
         this.restRot = this.rot;
+        this.homeX = this.x;
+        this.homeY = this.y;
         this.vx = this.vy = this.vr = 0;
       }
       return true;
@@ -88,6 +101,11 @@ export class Body {
     this.vr += delta * HINGE_STIFFNESS;
     this.vr *= HINGE_DAMPING;
     this.rot += this.vr;
+
+    const hx = this.homeX - this.x;
+    const hy = this.homeY - this.y;
+    if (Math.abs(hx) > HOME_SLACK) this.vx += hx * HOME_PULL;
+    if (Math.abs(hy) > HOME_SLACK) this.vy += hy * HOME_PULL;
 
     this.vx *= 0.8;
     this.vy *= 0.8;

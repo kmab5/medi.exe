@@ -85,6 +85,44 @@ export function marginLayout(margin, pieceLayout) {
   return layout;
 }
 
+// Notes hang in a column to the left of the oldest work, like a noticeboard beside
+// the wall rather than scattered through it. Deliberate placement, because writing
+// that has to be hunted for does not get read.
+const NOTE_WIDTH = 400;
+
+export function noteLayout(notes, pieceLayout) {
+  const boxes = Object.values(pieceLayout);
+  const minX = boxes.length ? Math.min(...boxes.map((b) => b.x)) : 0;
+  const minY = boxes.length ? Math.min(...boxes.map((b) => b.y)) : 0;
+  const maxY = boxes.length ? Math.max(...boxes.map((b) => b.y + b.h)) : 1200;
+
+  const gap = 90;
+  const layout = {};
+  let y = minY;
+
+  for (const note of notes) {
+    const rand = seedOf(note.id);
+    // Height follows the amount of writing, so a one-line note is not a tall
+    // empty card.
+    const lines = (note.body ?? []).reduce((n, p) => n + Math.ceil(p.length / 42), 0);
+    const h = Math.round(120 + lines * 26 + (note.links?.length ?? 0) * 30);
+
+    layout[note.id] = {
+      x: Math.round(minX - NOTE_WIDTH - 220 + (rand() - 0.5) * 70),
+      y: Math.round(y),
+      w: NOTE_WIDTH,
+      h,
+      rot: +((rand() - 0.5) * 4).toFixed(2),
+    };
+    y += h + gap;
+  }
+
+  // If the notes column runs longer than the wall, that is fine — bounds are
+  // computed from everything together.
+  void maxY;
+  return layout;
+}
+
 export function boundsOf(layout) {
   const boxes = Object.values(layout);
   if (!boxes.length) return { x: 0, y: 0, w: 1000, h: 1000 };

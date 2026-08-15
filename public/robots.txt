@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /medi-login.html
+Disallow: /api/
+
+# The upload page is unlisted rather than secret — obscurity is not the control.
+# MEDI_PASSWORD is. This just keeps it out of search results.

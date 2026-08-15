@@ -179,3 +179,123 @@ test('scrub layers are hidden on non-primary sheets', async () => {
   while (piece.sheetIndex !== 0) piece.riffle();
   assert.equal(piece.flatImg.style.display, '');
 });
+
+test('every piece gets a movement personality with real amplitude', async () => {
+  const { Piece } = await import('../public/js/piece.js');
+  const m = await manifest();
+  const seen = new Set();
+
+  for (const data of m.pieces) {
+    const piece = new Piece(data, { x: 0, y: 0, w: 320, h: 400, rot: 0 });
+    seen.add(piece.move);
+    const amp = parseFloat(piece.el.style.getPropertyValue('--amp'));
+    const dur = parseFloat(piece.el.style.getPropertyValue('--dur'));
+    const delay = parseFloat(piece.el.style.getPropertyValue('--delay'));
+    assert.ok(amp >= 0.7, `amplitude ${amp} too small to read as movement`);
+    assert.ok(dur > 0.4 && dur < 8, `duration ${dur} out of range`);
+    assert.ok(delay <= 0, 'delay must be negative so pieces start mid-cycle');
+    assert.ok(piece.el.className.includes('m-'), 'no movement class applied');
+  }
+
+  assert.ok(seen.size >= 4, `expected varied movement, got only ${[...seen].join(', ')}`);
+});
+
+test('pieces are not all moving in lockstep', async () => {
+  const { Piece } = await import('../public/js/piece.js');
+  const m = await manifest();
+  const durations = m.pieces.map((d) => {
+    const p = new Piece(d, { x: 0, y: 0, w: 320, h: 400, rot: 0 });
+    return p.el.style.getPropertyValue('--dur');
+  });
+  assert.ok(new Set(durations).size > m.pieces.length * 0.7, 'durations are too clustered');
+});
+
+test('video pieces build a preview layer and non-video pieces do not', async () => {
+  const { Piece } = await import('../public/js/piece.js');
+  const m = await manifest();
+
+  const withVideo = m.pieces.find((p) => p.preview);
+  assert.ok(withVideo, 'manifest should contain a piece with a preview clip');
+  const vp = new Piece(withVideo, { x: 0, y: 0, w: 320, h: 400, rot: 0 });
+  vp.load();
+  assert.ok(vp.previewVideo, 'no preview element');
+  assert.ok(vp.el.classList.contains('has-video'));
+  // Source must not be attached until play is requested, or the wall fetches
+  // every clip on load.
+  assert.ok(!vp.previewVideo.getAttribute('src'), 'preview fetched before it was needed');
+
+  const noVideo = m.pieces.find((p) => !p.preview);
+  const np = new Piece(noVideo, { x: 0, y: 0, w: 320, h: 400, rot: 0 });
+  np.load();
+  assert.equal(np.previewVideo, undefined);
+});
+
+test('scrubbing away from finished stops preview playback', async () => {
+  const { Piece } = await import('../public/js/piece.js');
+  const m = await manifest();
+  const p = new Piece(m.pieces.find((x) => x.preview), { x: 0, y: 0, w: 320, h: 400, rot: 0 });
+  p.load();
+
+  p.setScrub(1);
+  assert.ok(!p.scrubbed);
+  p.setScrub(0.5);
+  assert.ok(p.scrubbed, 'should register as scrubbed');
+  assert.ok(p.el.classList.contains('scrubbing'));
+
+  // setPreviewPlaying must refuse while scrubbed rather than start a video that
+  // contradicts the un-rendered image beneath it.
+  p.setPreviewPlaying(true);
+  assert.ok(!p.el.classList.contains('previewing'));
+});
+
+test('notes render their writing and links', async () => {
+  const { Note } = await import('../public/js/note.js');
+  const m = await manifest();
+  assert.ok(m.notes.length > 0, 'manifest carries no notes');
+
+  const withLinks = m.notes.find((n) => n.links?.length) ?? m.notes[0];
+  const note = new Note(withLinks, { x: 10, y: 20, w: 400, h: 300, rot: 1 });
+
+  assert.ok(note.isNote);
+  assert.equal(note.el.querySelector('.note-title').textContent, withLinks.title);
+  assert.equal(note.el.querySelectorAll('.note-body p').length, withLinks.body.length);
+  if (withLinks.links?.length) {
+    assert.equal(note.el.querySelectorAll('.note-links a').length, withLinks.links.length);
+  }
+  assert.match(note.el.style.transform, /translate3d\(10\.0px, 20\.0px, 0\)/);
+});
+
+test('notes escape html rather than injecting it', async () => {
+  const { Note } = await import('../public/js/note.js');
+  const note = new Note(
+    { id: 'x', title: '<img src=x onerror=alert(1)>', body: ['<script>bad()</script>'] },
+    { x: 0, y: 0, w: 300, h: 200, rot: 0 },
+  );
+  assert.equal(note.el.querySelectorAll('img, script').length, 0, 'markup was injected');
+  assert.ok(note.el.querySelector('.note-title').textContent.includes('<img'));
+});
+
+test('notes implement the piece interface so the wall need not branch', async () => {
+  const { Note } = await import('../public/js/note.js');
+  const note = new Note({ id: 'x', title: 't', body: ['b'] }, { x: 0, y: 0, w: 300, h: 200, rot: 0 });
+  for (const method of ['place', 'worldBox', 'load', 'setScrub', 'setPreviewPlaying', 'riffle', 'flip', 'lookAt']) {
+    assert.equal(typeof note[method], 'function', `Note is missing ${method}`);
+  }
+  assert.doesNotThrow(() => { note.setScrub(0.5); note.load(); note.riffle(); note.lookAt(0, 0); });
+});
+
+test('notes are laid out clear of the artwork', async () => {
+  const { defaultLayout, noteLayout } = await import('../public/js/layout.js');
+  const m = await manifest();
+  const pieces = defaultLayout(m.pieces);
+  const notes = noteLayout(m.notes, pieces);
+
+  assert.equal(Object.keys(notes).length, m.notes.length);
+  for (const n of Object.values(notes)) {
+    assert.ok(n.w > 0 && n.h > 0);
+    for (const b of Object.values(pieces)) {
+      const overlaps = n.x < b.x + b.w && n.x + n.w > b.x && n.y < b.y + b.h && n.y + n.h > b.y;
+      assert.ok(!overlaps, 'a note overlaps artwork');
+    }
+  }
+});

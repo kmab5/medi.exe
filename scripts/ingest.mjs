@@ -12,6 +12,10 @@ const OUT = process.argv[3] ?? 'source';
 const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const VIDEO_EXT = new Set(['.mp4', '.mov']);
 
+const PREVIEW_WIDTH = 460;
+const PREVIEW_FPS = 12;
+const PREVIEW_SECONDS = 8;
+
 // Instagram media IDs are snowflake-style: the top 41 bits are milliseconds since
 // the Instagram epoch. Shortcodes are those IDs in a big-endian base64 alphabet.
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -78,6 +82,38 @@ async function posterFrame(video, dest) {
   await run('ffmpeg', [
     '-v', 'error', '-y', '-ss', String(at), '-i', video,
     '-frames:v', '1', '-q:v', '2', dest,
+  ]);
+}
+
+// A lightweight looping clip for the wall face. Full timelapses are 1–2MB each and
+// autoplaying eighteen of them would be indefensible; these come out around a tenth
+// of that and still read as motion at wall scale.
+//
+// Not a GIF. A muted H.264 loop is roughly an order of magnitude smaller than the
+// equivalent GIF, keeps full colour instead of 256, and decodes on the GPU.
+//
+// This lives in ingest rather than build because build runs on Vercel, where there
+// is no ffmpeg.
+async function previewClip(video, dest) {
+  const { stdout } = await run('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video,
+  ]);
+  const duration = parseFloat(stdout.trim()) || 1;
+  const start = Math.max(0, Math.min(duration * 0.15, Math.max(0, duration - PREVIEW_SECONDS)));
+
+  await run('ffmpeg', [
+    '-v', 'error', '-y',
+    '-ss', String(start),
+    '-t', String(Math.min(PREVIEW_SECONDS, duration)),
+    '-i', video,
+    '-an',
+    '-vf', `scale=${PREVIEW_WIDTH}:-2:flags=lanczos,fps=${PREVIEW_FPS}`,
+    '-c:v', 'libx264',
+    '-profile:v', 'baseline',
+    '-pix_fmt', 'yuv420p',
+    '-crf', '31',
+    '-movflags', '+faststart',
+    dest,
   ]);
 }
 
@@ -156,9 +192,17 @@ async function main() {
     }
 
     let timelapse = null;
+    let preview = null;
     if (piece.video) {
       timelapse = `video/${id}${extname(piece.video)}`;
       await copyFile(piece.video, join(OUT, timelapse));
+      preview = `video/${id}-preview.mp4`;
+      try {
+        await previewClip(piece.video, join(OUT, preview));
+      } catch (err) {
+        console.warn(`  ${id}: preview failed (${err.message}), falling back to the full clip`);
+        preview = timelapse;
+      }
       videoCount++;
     }
 
@@ -169,6 +213,7 @@ async function main() {
       posted,
       stack: names.slice(1),
       timelapse,
+      preview,
       title: '',
       label: '',
     };

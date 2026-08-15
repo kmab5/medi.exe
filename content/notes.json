@@ -1,0 +1,59 @@
+{
+  "_comment": "Notes pinned to the wall and rendered on notes.html. Edit freely — this file is the only place the words live. `kind` picks the paper: note, index, sticky, receipt. Order here is the order they appear.",
+
+  "notes": [
+    {
+      "id": "welcome",
+      "kind": "note",
+      "title": "welcome to the pretty corner of my mind",
+      "body": [
+        "I draw people, mostly. Faces doing something with their whole face.",
+        "Multifandom, mainly One Piece, and a steady amount of characters nobody asked me to draw.",
+        "Everything on this wall was posted somewhere between April 2024 and now. You can pull any of it off the wall and throw it. Nothing breaks."
+      ]
+    },
+    {
+      "id": "commissions",
+      "kind": "index",
+      "title": "commissions are open",
+      "body": [
+        "Bust, half body, full body. Original characters welcome, fan characters welcome, your D&D guy especially welcome.",
+        "DM me on Instagram with what you want, references if you have them, and roughly when you need it.",
+        "I will tell you a price and a turnaround before either of us commits to anything."
+      ],
+      "links": [
+        { "label": "@tiredmedi on Instagram", "href": "https://www.instagram.com/tiredmedi/" },
+        { "label": "buy me a coffee", "href": "https://buymeacoffee.com/hananseifu1" }
+      ]
+    },
+    {
+      "id": "process",
+      "kind": "sticky",
+      "title": "the slider",
+      "body": [
+        "Drag the un-render slider and the whole wall walks itself backwards — finished, then flat colour, then lineart, then a rough underdrawing.",
+        "Be honest about this one: most of those stages are reconstructed by the site, not scans of my actual layers. The pieces marked 'actual wip' are the real thing."
+      ]
+    },
+    {
+      "id": "about",
+      "kind": "note",
+      "title": "who is doing this",
+      "body": [
+        "Medi. She/her. I have been drawing for a while and posting for less time than that.",
+        "The old version of this site was mostly jokes about One Piece and being bad at talking to people. That was accurate. This version has more drawings on it.",
+        "Rewrite me — this note is a draft written by someone who is not Medi."
+      ]
+    },
+    {
+      "id": "currently",
+      "kind": "receipt",
+      "title": "currently",
+      "body": [
+        "Working on: something with too many hands in it.",
+        "Avoiding: backgrounds.",
+        "Last updated: whenever I last edited notes.json, which is displayed below."
+      ]
+    }
+  ]
+}

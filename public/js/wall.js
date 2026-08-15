@@ -5,7 +5,8 @@
 import { Camera, bindCameraGestures } from './camera.js';
 import { World, Body, Velocity } from './physics.js';
 import { Piece } from './piece.js';
-import { defaultLayout, marginLayout, boundsOf } from './layout.js';
+import { Note } from './note.js';
+import { defaultLayout, marginLayout, noteLayout, boundsOf } from './layout.js';
 import { bindScrubber, Minimap, Stickers, Sound } from './ui.js';
 import { store } from './store.js';
 
@@ -17,7 +18,11 @@ const stickerLayer = document.getElementById('sticker-layer');
 const marginLayer = document.getElementById('margin-layer');
 
 const state = {
+  // `pieces` is everything physical on the wall, notes included — they share an
+  // interface so physics, dragging and culling treat them identically. `artwork`
+  // is the subset that has layers to scrub.
   pieces: [],
+  artwork: [],
   byId: new Map(),
   layout: {},
   open: null,
@@ -27,6 +32,7 @@ async function boot() {
   const manifest = await fetch('art/manifest.json').then((r) => r.json());
 
   const base = defaultLayout(manifest.pieces);
+  Object.assign(base, noteLayout(manifest.notes ?? [], base));
   const saved = await store.loadLayout();
   // Saved positions are merged over the generated ones so a rebuild that adds new
   // pieces does not wipe where a visitor left the old ones.
@@ -53,8 +59,20 @@ async function boot() {
     piece.body = physics.add(new Body(piece, box));
     world.appendChild(piece.el);
     state.pieces.push(piece);
+    state.artwork.push(piece);
     state.byId.set(data.id, piece);
     bindPieceGestures(piece, camera, physics, sound);
+  }
+
+  for (const data of manifest.notes ?? []) {
+    const box = { ...state.layout[data.id] };
+    if (!box || box.w == null) continue;
+    const note = new Note(data, box, { onOpen: open });
+    note.body = physics.add(new Body(note, box));
+    world.appendChild(note.el);
+    state.pieces.push(note);
+    state.byId.set(data.id, note);
+    bindPieceGestures(note, camera, physics, sound);
   }
 
   renderMargin(manifest.margin, state.layout);
@@ -64,7 +82,7 @@ async function boot() {
   camera.fit(bounds);
 
   minimap = new Minimap(document.getElementById('minimap'), {
-    pieces: state.pieces,
+    pieces: state.artwork,
     bounds,
     camera,
     onJump: (w) => camera.flyTo({ x: w.x - 400, y: w.y - 400, w: 800, h: 800 }, { maxScale: 0.5 }),
@@ -79,13 +97,14 @@ async function boot() {
   });
 
   const applyScrub = bindScrubber(document.getElementById('scrub'), (t) => {
-    for (const p of state.pieces) p.setScrub(t);
+    for (const p of state.artwork) p.setScrub(t);
+    if (cameraRef) updatePreviews(cameraRef);
   });
 
   const stickers = new Stickers({
     sheetEl: document.getElementById('sticker-sheet'),
     layerEl: stickerLayer,
-    pieces: state.pieces,
+    pieces: state.artwork,
     camera,
     sound,
   });
@@ -136,6 +155,9 @@ function bindPieceGestures(piece, camera, physics, sound) {
 
   piece.el.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.back-cta')) return;
+    // A note's body is meant to be read and selected, so drags start from its
+    // title, its edges or its tape. Everything else on the wall drags anywhere.
+    if (piece.isNote && e.target.closest('.note-body, .note-links')) return;
     e.stopPropagation();
 
     if (e.target.closest('.stack-pip')) {
@@ -215,6 +237,40 @@ function cull(camera) {
     if (visible) p.load();
     p.el.classList.toggle('offscreen', !visible);
   }
+
+  updatePreviews(camera);
+}
+
+// At most a few preview loops run at once. Decoding eighteen videos simultaneously
+// would cost more than the whole rest of the wall, so the budget goes to whichever
+// video pieces are closest to the centre of the screen — and only once the piece is
+// large enough on screen for the motion to actually read.
+const PREVIEW_BUDGET = 4;
+const PREVIEW_MIN_PX = 150;
+
+function updatePreviews(camera) {
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const cx = vw / 2;
+  const cy = vh / 2;
+
+  const candidates = [];
+  for (const p of state.artwork) {
+    if (!p.previewVideo || p.scrubbed) continue;
+    const s = camera.worldToScreen(p.box.x + p.box.w / 2, p.box.y + p.box.h / 2);
+    const onScreen = s.x > -100 && s.x < vw + 100 && s.y > -100 && s.y < vh + 100;
+    const bigEnough = p.box.w * camera.scale >= PREVIEW_MIN_PX;
+    if (onScreen && bigEnough) {
+      candidates.push({ piece: p, d: Math.hypot(s.x - cx, s.y - cy) });
+    }
+  }
+
+  candidates.sort((a, b) => a.d - b.d);
+  const playing = new Set(candidates.slice(0, PREVIEW_BUDGET).map((c) => c.piece));
+
+  for (const p of state.artwork) {
+    if (p.previewVideo) p.setPreviewPlaying(playing.has(p));
+  }
 }
 
 function open(piece) {
@@ -229,6 +285,10 @@ function open(piece) {
 
   const cap = document.getElementById('caption');
   cap.querySelector('.cap-title').textContent = piece.data.title || piece.data.id;
+  if (piece.isNote) {
+    cap.querySelector('.cap-meta').textContent = 'a note';
+    return;
+  }
   const date = piece.data.posted
     ? new Date(piece.data.posted).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })
     : '';
@@ -253,20 +313,43 @@ function startAmbient(camera) {
     if (now - lastLook < 60) return;
     lastLook = now;
     const w = camera.screenToWorld(e.clientX, e.clientY);
-    for (const p of state.pieces) {
+    for (const p of state.artwork) {
       if (p.pupils && !p.el.classList.contains('offscreen')) p.lookAt(w.x, w.y);
     }
   });
 
-  // Every so often a piece slips a little and re-settles, so the wall is always
-  // quietly coming apart even when nobody is touching it.
-  setInterval(() => {
-    const candidates = state.pieces.filter((p) => !p.el.classList.contains('offscreen'));
-    if (!candidates.length) return;
-    const p = candidates[Math.floor(Math.random() * candidates.length)];
-    p.body.vr += (Math.random() - 0.5) * 1.6;
-    p.body.wake();
-  }, 6500);
+  // Ambient disturbance. Every few seconds something on the wall shifts on its
+  // own. Kinds are mixed so it never reads as one repeating tic: a nudge is a
+  // small spin, a slip drags the piece a little way and leaves it there, and a
+  // gust hits several neighbours at once.
+  const disturb = () => {
+    const visible = state.pieces.filter((p) => !p.el.classList.contains('offscreen'));
+    if (visible.length) {
+      const roll = Math.random();
+      const pick = () => visible[Math.floor(Math.random() * visible.length)];
+
+      if (roll < 0.55) {
+        const p = pick();
+        p.body.vr += (Math.random() - 0.5) * 5;
+        p.body.wake();
+      } else if (roll < 0.85) {
+        const p = pick();
+        p.body.vx += (Math.random() - 0.5) * 7;
+        p.body.vy += (Math.random() - 0.5) * 5;
+        p.body.vr += (Math.random() - 0.5) * 3;
+        p.body.wake();
+      } else {
+        for (const p of visible.slice(0, 6)) {
+          p.body.vr += (Math.random() - 0.5) * 3.5;
+          p.body.vx += (Math.random() - 0.5) * 3;
+          p.body.wake();
+        }
+      }
+    }
+    // Irregular interval, so the wall never feels metronomic.
+    setTimeout(disturb, 1400 + Math.random() * 3600);
+  };
+  setTimeout(disturb, 1800);
 }
 
 function wireChrome(camera, sound, bounds) {
@@ -282,7 +365,7 @@ function wireChrome(camera, sound, bounds) {
   });
 
   document.getElementById('shuffle').addEventListener('click', () => {
-    const p = state.pieces[Math.floor(Math.random() * state.pieces.length)];
+    const p = state.artwork[Math.floor(Math.random() * state.artwork.length)];
     camera.flyTo(p.worldBox(), { maxScale: 0.9 });
   });
 
