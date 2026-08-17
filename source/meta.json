@@ -114,7 +114,8 @@
     "timelapse": "video/duqeob-d.mp4",
     "preview": "video/duqeob-d-preview.mp4",
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "dbrfi05s.jpg": {
     "shortcode": "DbRfi05s",
@@ -204,7 +205,8 @@
     "timelapse": null,
     "preview": null,
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "c8u7lsjc.jpg": {
     "shortcode": "C8u7lsJC",
@@ -800,7 +802,8 @@
     "timelapse": null,
     "preview": null,
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "dbtrq9yj--2.jpg": {
     "child": true
