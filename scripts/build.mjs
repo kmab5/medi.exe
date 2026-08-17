@@ -6,64 +6,9 @@ import { join, extname, basename } from 'node:path';
 const SRC = process.argv[2] ?? 'source';
 const OUT = process.argv[3] ?? 'public/art';
 
-const SIZES = { final: 1440, flat: 1000, edge: 1000, cutout: 700, thumb: 72 };
-
-// Palette quantisation rather than per-channel banding. Banding each channel
-// independently shifts hue badly — brown hair goes olive, pink paper goes yellow —
-// because the channels cross their thresholds at different points. A palette keeps
-// the artist's actual colours and just removes the shading between them.
-const FLAT_COLOURS = 10;
-
-// Sobel magnitude below this is incidental texture rather than linework. Tuned
-// against the real art: paper grain and soft airbrush gradients sit well under it,
-// inked contours sit well over.
-const EDGE_THRESHOLD = 70;
+const SIZES = { final: 1440, cutout: 700, thumb: 72 };
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-
-async function flatMap(input) {
-  const png = await sharp(input)
-    .resize(SIZES.flat, SIZES.flat, { fit: 'inside', withoutEnlargement: true })
-    .median(3)
-    .png({ palette: true, colours: FLAT_COLOURS, dither: 0, effort: 7 })
-    .toBuffer();
-  return sharp(png).webp({ quality: 84 }).toBuffer();
-}
-
-// Sobel over the flat map, not the original. Shading gradients in the original
-// produce phantom contours through the middle of a cheek; the quantised version
-// only has edges where the artist put them.
-async function edgeMap(flatBuf) {
-  const { data, info } = await sharp(flatBuf)
-    .resize(SIZES.edge, SIZES.edge, { fit: 'inside', withoutEnlargement: true })
-    .greyscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const { width: w, height: h } = info;
-  const out = Buffer.alloc(w * h, 255);
-
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      const tl = data[i - w - 1], tc = data[i - w], tr = data[i - w + 1];
-      const ml = data[i - 1], mr = data[i + 1];
-      const bl = data[i + w - 1], bc = data[i + w], br = data[i + w + 1];
-
-      const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
-      const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
-      const mag = Math.sqrt(gx * gx + gy * gy);
-
-      // Retain magnitude so heavy contours stay darker than incidental detail —
-      // a flat black threshold reads as a stencil rather than a drawing.
-      if (mag > EDGE_THRESHOLD) out[i] = Math.max(0, 255 - Math.min(255, mag));
-    }
-  }
-
-  return sharp(out, { raw: { width: w, height: h, channels: 1 } })
-    .webp({ quality: 86 })
-    .toBuffer();
-}
 
 // The art already ships with white sticker borders, so a sticker is the piece
 // trimmed to its content bounds.
@@ -120,19 +65,10 @@ async function buildSheet(srcPath, id, outDir, { layers = 'full' } = {}) {
   };
 
   if (layers === 'full') {
-    const flatBuf = await flatMap(raw);
-    const edgeBuf = await edgeMap(flatBuf);
-    const cutBuf = await cutout(raw);
-    await Promise.all([
-      writeFile(join(dir, 'flat.webp'), flatBuf),
-      writeFile(join(dir, 'edge.webp'), edgeBuf),
-      writeFile(join(dir, 'cutout.webp'), cutBuf),
-    ]);
-    Object.assign(out.layers, {
-      flat: `art/${id}/flat.webp`,
-      edge: `art/${id}/edge.webp`,
-      cutout: `art/${id}/cutout.webp`,
-    });
+    // Only the primary sheet of a piece needs a cutout — stickers are made from
+    // the face, never from an album's inner pages.
+    await writeFile(join(dir, 'cutout.webp'), await cutout(raw));
+    out.layers.cutout = `art/${id}/cutout.webp`;
   }
 
   return out;
@@ -319,7 +255,11 @@ async function main() {
 
   const meta = await loadMeta();
   const files = await imagesIn(SRC);
-  const parents = files.filter((f) => !meta[f]?.child);
+  // `hidden` is set from the dashboard. Hidden pieces are still built — the images
+  // stay in the repo and can be brought back with one click — but they are left out
+  // of the manifest, so they appear on neither the wall nor the list.
+  const parents = files.filter((f) => !meta[f]?.child && !meta[f]?.hidden);
+  const hiddenCount = files.filter((f) => meta[f]?.hidden && !meta[f]?.child).length;
 
   console.log(`building ${parents.length} pieces from ${files.length} sheets`);
 
@@ -340,14 +280,6 @@ async function main() {
         if (!existsSync(join(SRC, child))) continue;
         const childId = `${id}--${i + 2}`;
         stack.push(await buildSheet(join(SRC, child), childId, OUT, { layers: 'light' }));
-      }
-
-      const wipDir = join(SRC, 'wips', id);
-      const wipFiles = await imagesIn(wipDir);
-      const wips = [];
-      for (const [i, w] of wipFiles.entries()) {
-        const wipId = `${id}--wip-${i + 1}`;
-        wips.push(await buildSheet(join(wipDir, w), wipId, OUT, { layers: 'light' }));
       }
 
       // Video lives in source/video/ but must be served from the build output, or
@@ -382,9 +314,6 @@ async function main() {
         preview,
         // Optional, written by scripts/tag-eyes.mjs. Absent means no eye tracking.
         eyes: m.eyes ?? null,
-        // Real WIP files win over the synthesised un-render when present.
-        realWip: wips.length > 0,
-        wips,
         stack,
         ...primary,
       });
@@ -409,7 +338,7 @@ async function main() {
 
   pieces.sort((a, b) => String(a.posted).localeCompare(String(b.posted)));
 
-  const notes = await loadNotes();
+  const notes = (await loadNotes()).filter((n) => !n.hidden);
 
   const manifest = {
     generated: new Date().toISOString(),
@@ -424,6 +353,7 @@ async function main() {
 
   const withDates = pieces.filter((p) => p.posted).length;
   console.log(`\n${pieces.length} pieces, ${margin.length} margin, ${notes.length} notes, ${withDates} dated`);
+  if (hiddenCount) console.log(`${hiddenCount} piece(s) hidden from the dashboard`);
   console.log(`wrote ${OUT}/manifest.json`);
 }
 

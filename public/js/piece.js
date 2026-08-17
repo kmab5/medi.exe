@@ -1,10 +1,8 @@
-// One sheet of paper on the wall. Owns its DOM, its layer images, its scrub state,
+// One sheet of paper on the wall. Owns its DOM, its layer image, its preview loop
 // and its front/back flip. It does not know about the camera, the store, or the
 // other pieces.
 
 import { seedOf } from './layout.js';
-
-const SCRUB_STAGES = 3; // final -> flat -> edge
 
 export class Piece {
   constructor(data, box, { onOpen, onGrab } = {}) {
@@ -56,7 +54,6 @@ export class Piece {
           <div class="layers" style="background:${this.data.dominant}"></div>
           ${this.data.eyes ? '<div class="eyes" aria-hidden="true"></div>' : ''}
           ${this.data.stack?.length ? `<div class="stack-pip" aria-hidden="true">${this.data.stack.length + 1}</div>` : ''}
-          ${this.data.realWip ? '<div class="wip-flag">actual wip</div>' : ''}
         </div>
         <div class="face back">
           <p class="back-title"></p>
@@ -116,8 +113,6 @@ export class Piece {
 
     this.finalImg = add('final', 'l-final');
     this.finalImg?.addEventListener('load', () => this.el.classList.add('ready'), { once: true });
-    this.flatImg = add('flat', 'l-flat');
-    this.edgeImg = add('edge', 'l-edge');
 
     // A piece whose source was a video gets its preview loop on the face, sitting
     // above the still. It is created but never loaded until asked to play, so the
@@ -190,36 +185,12 @@ export class Piece {
     }
   }
 
-  // t runs 1 (final render) to 0 (underdrawing). Stages cross-fade; the warp only
-  // ramps in over the last third so the lines go uncertain rather than the whole
-  // image smearing.
-  setScrub(t) {
-    if (!this.loaded) return;
-    const s = t * SCRUB_STAGES;
-
-    if (this.flatImg) this.flatImg.style.opacity = String(clamp01(2 - s));
-    if (this.edgeImg) this.edgeImg.style.opacity = String(clamp01(1 - s));
-
-    // Scrubbing away from finished hides the preview — an un-rendered piece
-    // playing a fully rendered video would contradict itself.
-    const scrubbed = t < 0.97;
-    if (scrubbed !== this.scrubbed) {
-      this.scrubbed = scrubbed;
-      if (scrubbed) this.setPreviewPlaying(false);
-      this.el.classList.toggle('scrubbing', scrubbed);
-    }
-
-    const warp = clamp01(1 - s * 1.5);
-    this.el.classList.toggle('warped', warp > 0.02);
-    this.el.style.setProperty('--warp', warp.toFixed(3));
-  }
-
   // Play budget is managed by the wall: only a handful of previews run at once.
   // The source is attached on first play rather than at construction so that a
   // preview which is never seen is never fetched.
   setPreviewPlaying(on) {
     const v = this.previewVideo;
-    if (!v || this.scrubbed) return;
+    if (!v) return;
     if (on) {
       if (!v.src) {
         v.src = this.data.preview;
@@ -248,11 +219,6 @@ export class Piece {
     this.sheetIndex = (this.sheetIndex + 1) % sheets.length;
     const next = sheets[this.sheetIndex];
     if (this.finalImg) this.finalImg.src = next.layers.final;
-    // Only sheet one has flat and edge layers built, so scrubbing a riffled stack
-    // falls back to the final image alone rather than showing a stale underdrawing.
-    const isPrimary = this.sheetIndex === 0;
-    if (this.flatImg) this.flatImg.style.display = isPrimary ? '' : 'none';
-    if (this.edgeImg) this.edgeImg.style.display = isPrimary ? '' : 'none';
     this.el.classList.add('riffling');
     setTimeout(() => this.el.classList.remove('riffling'), 220);
   }
@@ -262,4 +228,3 @@ export class Piece {
   }
 }
 
-const clamp01 = (n) => Math.max(0, Math.min(1, n));

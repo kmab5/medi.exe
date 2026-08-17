@@ -4,407 +4,206 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<title>upload</title>
+<title>medi — dashboard</title>
 <style>
-  :root { --paper:#f4f1e8; --ink:#2a2723; --soft:#6a655c; --accent:#8a4a2a; --line:rgba(0,0,0,.14); }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink);
-         font:15px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif; }
-  .wrap { max-width:40rem; margin:0 auto; padding:56px 22px 90px; }
-  h1 { font-size:22px; font-weight:500; margin:0 0 4px; }
-  .lede { margin:0 0 34px; color:var(--soft); font-size:14px; }
-  label { display:block; font-size:13px; color:var(--soft); margin:20px 0 6px; }
-  input[type=text], input[type=password], textarea {
-    width:100%; padding:10px 12px; font:inherit; color:var(--ink);
-    background:#fbf9f4; border:1px solid var(--line); border-radius:4px;
+  :root {
+    --paper:#f4f1e8; --card:#fbf9f4; --ink:#22201c; --soft:#6f6a60;
+    --line:#ddd6c8; --accent:#8a4a2a; --ok:#2f6b42; --bad:#a3372f;
+    --radius:10px;
   }
-  textarea { min-height:74px; resize:vertical; }
-  input[type=file] { font:inherit; font-size:13px; }
-  .drop { margin-top:8px; padding:26px; text-align:center; border:1.5px dashed var(--line);
-          border-radius:6px; background:#fbf9f4; cursor:pointer; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font:15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+
+  /* ---- login ---- */
+  #login { min-height:100%; display:grid; place-items:center; padding:24px; }
+  #login .box { width:100%; max-width:22rem; }
+  #login h1 { font-size:26px; font-weight:500; margin:0 0 6px; letter-spacing:-.015em; }
+  #login p { margin:0 0 26px; color:var(--soft); font-size:14px; }
+  .field { display:flex; flex-direction:column; gap:7px; }
+  .field label { font-size:13px; color:var(--soft); }
+  input[type=text], input[type=password], textarea, select {
+    width:100%; padding:11px 13px; background:var(--card);
+    border:1px solid var(--line); border-radius:8px;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(138,74,42,.12);
+  }
+  .primary {
+    width:100%; margin-top:16px; padding:12px 18px; background:var(--ink); color:var(--paper);
+    border:0; border-radius:8px; font-weight:500;
+  }
+  .primary:disabled { opacity:.5; cursor:default; }
+
+  /* ---- shell ---- */
+  #app { display:none; min-height:100%; grid-template-columns:200px 1fr; }
+  #app.on { display:grid; }
+  aside {
+    border-right:1px solid var(--line); padding:26px 16px; display:flex; flex-direction:column; gap:4px;
+  }
+  aside h2 { font-size:15px; font-weight:500; margin:0 0 18px; padding:0 10px; letter-spacing:-.01em; }
+  .navbtn {
+    text-align:left; padding:9px 11px; background:none; border:0; border-radius:7px;
+    color:var(--soft); font-size:14px;
+  }
+  .navbtn:hover { background:rgba(0,0,0,.04); color:var(--ink); }
+  .navbtn.on { background:rgba(138,74,42,.1); color:var(--ink); font-weight:500; }
+  aside .spacer { flex:1; }
+  aside a { font-size:13px; color:var(--soft); padding:6px 11px; text-decoration:none; }
+  aside a:hover { color:var(--accent); }
+
+  main { padding:34px 34px 90px; max-width:56rem; }
+  .head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:6px; }
+  h3 { font-size:19px; font-weight:500; margin:0; letter-spacing:-.01em; }
+  .sub { margin:0 0 26px; color:var(--soft); font-size:14px; }
+  .panel { display:none; }
+  .panel.on { display:block; }
+
+  /* ---- pieces ---- */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+  .tile .shot { position:relative; aspect-ratio:1; background:#eae4d6; }
+  .tile img { width:100%; height:100%; object-fit:cover; display:block; transition:opacity .2s, filter .2s; }
+  .tile.off img { opacity:.32; filter:grayscale(1); }
+  .tile .meta { padding:9px 11px 11px; }
+  .tile .name { font-size:13px; line-height:1.35; word-break:break-word; }
+  .tile .when { font-size:11.5px; color:var(--soft); margin-top:2px; }
+  .tile .row { display:flex; align-items:center; justify-content:space-between; margin-top:9px; gap:8px; }
+  .pill { font-size:10.5px; color:var(--soft); background:rgba(0,0,0,.05); padding:2px 7px; border-radius:20px; }
+
+  /* A switch, because a checkbox does not read as on/off at a glance. */
+  .sw { position:relative; width:38px; height:22px; flex:none; border:0; border-radius:20px;
+        background:var(--line); transition:background .18s; padding:0; }
+  .sw::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px;
+               border-radius:50%; background:#fff; transition:transform .18s;
+               box-shadow:0 1px 2px rgba(0,0,0,.3); }
+  .sw[aria-checked=true] { background:var(--ok); }
+  .sw[aria-checked=true]::after { transform:translateX(16px); }
+
+  .bar {
+    position:fixed; left:200px; right:0; bottom:0; padding:14px 34px;
+    background:rgba(250,248,242,.96); border-top:1px solid var(--line);
+    display:none; align-items:center; gap:16px; backdrop-filter:blur(6px);
+  }
+  .bar.on { display:flex; }
+  .bar .primary { width:auto; margin:0; }
+  .bar .count { font-size:13.5px; color:var(--soft); }
+
+  /* ---- notes ---- */
+  .note-card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+               padding:16px 18px; margin-bottom:14px; }
+  .note-head { display:flex; gap:10px; align-items:center; }
+  .note-head input { flex:1; }
+  .note-head select { width:auto; }
+  .iconbtn { background:none; border:0; color:var(--soft); padding:6px 7px; border-radius:6px; font-size:14px; }
+  .iconbtn:hover { background:rgba(0,0,0,.05); color:var(--ink); }
+  .iconbtn.danger:hover { color:var(--bad); }
+  .note-card label { display:block; font-size:12.5px; color:var(--soft); margin:14px 0 6px; }
+  .note-card textarea { min-height:118px; resize:vertical; }
+  .note-card textarea.links { min-height:54px; }
+  .ghost { background:none; border:1px solid var(--line); border-radius:8px; padding:9px 14px; }
+
+  /* ---- upload ---- */
+  .drop { padding:30px; text-align:center; border:1.5px dashed var(--line); border-radius:var(--radius);
+          background:var(--card); }
   .drop.over { border-color:var(--accent); background:#f7f0e6; }
-  .drop p { margin:0; font-size:13px; color:var(--soft); }
-  #thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
-  #thumbs figure { margin:0; width:76px; }
-  #thumbs img, #thumbs video { width:76px; height:76px; object-fit:cover; border-radius:3px;
-                               box-shadow:0 1px 4px rgba(0,0,0,.2); display:block; }
-  #thumbs figcaption { font-size:10.5px; color:var(--soft); margin-top:3px; text-align:center; }
-  button { margin-top:28px; padding:11px 20px; font:inherit; background:var(--ink); color:var(--paper);
-           border:0; border-radius:4px; cursor:pointer; }
-  button:disabled { opacity:.45; cursor:default; }
-  #log { margin-top:22px; font:13px/1.6 ui-monospace, Menlo, monospace; white-space:pre-wrap;
-         color:var(--soft); }
-  .err { color:#a33; }
-  .ok { color:#2a6a3a; }
-  .bar { height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:16px; }
-  .bar span { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
-  .tabs { display:flex; gap:4px; margin:30px 0 4px; border-bottom:1px solid var(--line); }
-  .tab { margin:0; padding:9px 15px; background:none; color:var(--soft); border-radius:4px 4px 0 0;
-         border-bottom:2px solid transparent; font-size:14px; }
-  .tab.on { color:var(--ink); border-bottom-color:var(--accent); }
-  .hint { font-size:13px; color:var(--soft); margin:22px 0 4px; }
-  code { font:12.5px ui-monospace, Menlo, monospace; background:#efeadf; padding:1px 5px; border-radius:3px; }
-  .ghost { background:none; color:var(--ink); border:1px solid var(--line); margin-right:8px; }
-  .note-card { border:1px solid var(--line); border-radius:6px; padding:16px 18px; margin-top:16px;
-               background:#fbf9f4; }
-  .note-card .row { display:flex; gap:10px; align-items:center; }
-  .note-card .row select { padding:8px; font:inherit; border:1px solid var(--line); border-radius:4px;
-                           background:#fff; }
-  .note-card label { margin-top:14px; }
-  .note-card .del { background:none; color:#a33; border:0; margin:0; padding:4px 6px; font-size:13px; }
-  .note-card .mv { background:none; color:var(--soft); border:0; margin:0; padding:4px 6px; }
-  .note-card textarea.body { min-height:120px; }
-  .note-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .drop p { margin:0; font-size:13.5px; color:var(--soft); }
+  #thumbs { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+  #thumbs figure { margin:0; width:78px; }
+  #thumbs img, #thumbs video { width:78px; height:78px; object-fit:cover; border-radius:6px; display:block; }
+  #thumbs figcaption { font-size:10.5px; color:var(--soft); text-align:center; margin-top:3px; }
+  .field + .field { margin-top:18px; }
+  .progress { height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:20px; }
+  .progress span { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
+
+  #log { margin-top:20px; font:13px/1.65 ui-monospace, Menlo, monospace; white-space:pre-wrap; color:var(--soft); }
+  .err { color:var(--bad); } .ok { color:var(--ok); }
+  .empty { color:var(--soft); font-size:14px; padding:26px 0; }
+
+  @media (max-width:720px) {
+    #app.on { grid-template-columns:1fr; }
+    aside { flex-direction:row; flex-wrap:wrap; border-right:0; border-bottom:1px solid var(--line);
+            padding:14px; gap:6px; }
+    aside h2, aside .spacer { display:none; }
+    main { padding:22px 18px 100px; }
+    .bar { left:0; padding:12px 18px; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>medi</h1>
-  <p class="lede">Add work, or rewrite the notes. Both commit to the repo, which redeploys automatically — give it a minute or two to appear.</p>
 
-  <label for="key">password</label>
-  <input id="key" type="password" autocomplete="current-password" spellcheck="false">
-
-  <div class="tabs" role="tablist">
-    <button id="tab-art" class="tab on" role="tab" aria-selected="true">add a piece</button>
-    <button id="tab-notes" class="tab" role="tab" aria-selected="false">edit notes</button>
+<div id="login">
+  <div class="box">
+    <h1>medi</h1>
+    <p>Sign in to manage the wall.</p>
+    <div class="field">
+      <label for="key">password</label>
+      <input id="key" type="password" autocomplete="current-password" spellcheck="false">
+    </div>
+    <button id="signin" class="primary">sign in</button>
+    <div id="login-log"></div>
   </div>
-
-<section id="panel-art">
-
-  <label for="title">title</label>
-  <input id="title" type="text" placeholder="what this is called">
-
-  <label for="label">label — appears on the back of the piece</label>
-  <textarea id="label" placeholder="a line about it"></textarea>
-
-  <label>files — one image, several for an album, or one video</label>
-  <div class="drop" id="drop">
-    <p>drop files here, or click to choose</p>
-    <input id="file" type="file" accept="image/*,video/mp4,video/quicktime" multiple hidden>
-  </div>
-  <div id="thumbs"></div>
-
-  <div class="bar"><span id="bar"></span></div>
-  <button id="go" disabled>upload</button>
-</section>
-
-<section id="panel-notes" hidden>
-  <p class="hint">These are the notes pinned to the wall and shown on the notes page. Blank lines separate paragraphs. Links are one per line as <code>label | https://…</code></p>
-  <button id="load-notes" class="ghost">load current notes</button>
-  <div id="notes"></div>
-  <button id="add-note" class="ghost" hidden>add a note</button>
-  <button id="save-notes" hidden>save notes</button>
-</section>
-
-  <div id="log"></div>
 </div>
 
-<script type="module">
-const MAX_EDGE = 1600;       // matches the build's `final` size; larger is wasted bytes
-const JPEG_QUALITY = 0.86;
-const MAX_BYTES = 4 * 1024 * 1024;
+<div id="app">
+  <aside>
+    <h2>medi</h2>
+    <button class="navbtn on" data-panel="pieces">pieces</button>
+    <button class="navbtn" data-panel="notes">notes</button>
+    <button class="navbtn" data-panel="upload">add new</button>
+    <div class="spacer"></div>
+    <a href="/" target="_blank" rel="noopener">view the wall ↗</a>
+    <button class="navbtn" id="signout">sign out</button>
+  </aside>
 
-const $ = (id) => document.getElementById(id);
-const log = (msg, cls = '') => {
-  const line = document.createElement('div');
-  if (cls) line.className = cls;
-  line.textContent = msg;
-  $('log').appendChild(line);
-};
+  <main>
+    <section class="panel on" id="panel-pieces">
+      <div class="head"><h3>pieces</h3><span class="count" id="visible-count"></span></div>
+      <p class="sub">Switch a piece off to take it down from the wall. Nothing is deleted — the file stays put and you can put it back any time.</p>
+      <div class="grid" id="tiles"></div>
+    </section>
 
-let files = [];
+    <section class="panel" id="panel-notes">
+      <div class="head"><h3>notes</h3></div>
+      <p class="sub">These appear beside the wall and on the notes page. Leave a blank line between paragraphs. Links go one per line as <code>label | https://…</code></p>
+      <div id="notes"></div>
+      <button id="add-note" class="ghost">add a note</button>
+    </section>
 
-$('drop').addEventListener('click', () => $('file').click());
-$('drop').addEventListener('dragover', (e) => { e.preventDefault(); $('drop').classList.add('over'); });
-$('drop').addEventListener('dragleave', () => $('drop').classList.remove('over'));
-$('drop').addEventListener('drop', (e) => {
-  e.preventDefault();
-  $('drop').classList.remove('over');
-  take([...e.dataTransfer.files]);
-});
-$('file').addEventListener('change', (e) => take([...e.target.files]));
+    <section class="panel" id="panel-upload">
+      <div class="head"><h3>add new</h3></div>
+      <p class="sub">One image, several for an album, or a video. It commits and the site rebuilds — give it a minute or two.</p>
 
-function take(list) {
-  files = list;
-  $('thumbs').innerHTML = '';
-  for (const f of files) {
-    const fig = document.createElement('figure');
-    const el = f.type.startsWith('video') ? document.createElement('video') : document.createElement('img');
-    el.src = URL.createObjectURL(f);
-    if (el.tagName === 'VIDEO') { el.muted = true; el.playsInline = true; }
-    const cap = document.createElement('figcaption');
-    cap.textContent = `${(f.size / 1048576).toFixed(1)}MB`;
-    fig.append(el, cap);
-    $('thumbs').appendChild(fig);
-  }
-  $('go').disabled = files.length === 0;
-}
-
-// Images are downscaled in the browser. A 3MB phone photo becomes about 300KB,
-// which keeps every request well inside the serverless body limit and matches what
-// the build would produce anyway.
-function downscale(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(img.src);
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', JPEG_QUALITY);
-    };
-    img.onerror = () => reject(new Error(`could not read ${file.name}`));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-// A video needs a still for the wall face. The server has no ffmpeg, so the frame
-// is grabbed here, a little way in — the opening frames of a timelapse are usually
-// a blank canvas.
-function posterFrame(file) {
-  return new Promise((resolve, reject) => {
-    const v = document.createElement('video');
-    v.muted = true;
-    v.playsInline = true;
-    v.preload = 'metadata';
-    v.onloadedmetadata = () => { v.currentTime = Math.min(v.duration * 0.4, v.duration - 0.1); };
-    v.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = v.videoWidth;
-      canvas.height = v.videoHeight;
-      canvas.getContext('2d').drawImage(v, 0, 0);
-      URL.revokeObjectURL(v.src);
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('poster failed'))), 'image/jpeg', 0.9);
-    };
-    v.onerror = () => reject(new Error('could not read the video'));
-    v.src = URL.createObjectURL(file);
-  });
-}
-
-const toBase64 = (blob) => new Promise((resolve, reject) => {
-  const r = new FileReader();
-  r.onload = () => resolve(r.result.split(',')[1]);
-  r.onerror = () => reject(new Error('read failed'));
-  r.readAsDataURL(blob);
-});
-
-async function post(body) {
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-medi-key': $('key').value },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({ error: `http ${res.status}` }));
-  if (!res.ok) throw new Error(json.error ?? `http ${res.status}`);
-  return json;
-}
-
-async function uploadBlob(blob, type, name) {
-  if (blob.size > MAX_BYTES) {
-    throw new Error(`${name} is ${(blob.size / 1048576).toFixed(1)}MB after processing — too large`);
-  }
-  const { sha } = await post({ action: 'blob', type, data: await toBase64(blob) });
-  return sha;
-}
-
-$('go').addEventListener('click', async () => {
-  $('go').disabled = true;
-  $('log').innerHTML = '';
-  const bar = $('bar');
-
-  try {
-    if (!$('key').value) throw new Error('password first');
-    if (!$('title').value.trim()) throw new Error('give it a title');
-
-    const video = files.find((f) => f.type.startsWith('video'));
-    const images = files.filter((f) => !f.type.startsWith('video'));
-    const total = files.length + (video ? 1 : 0);
-    let done = 0;
-    const tick = () => { bar.style.width = `${Math.round((++done / (total + 1)) * 100)}%`; };
-
-    const sheets = [];
-    for (const f of images) {
-      log(`processing ${f.name}…`);
-      const sha = await uploadBlob(await downscale(f), 'image/jpeg', f.name);
-      sheets.push({ sha });
-      tick();
-    }
-
-    let videoRef = null;
-    let posterSha = null;
-    if (video) {
-      log('grabbing a poster frame…');
-      posterSha = await uploadBlob(await posterFrame(video), 'image/jpeg', 'poster');
-      tick();
-      log(`uploading ${video.name}…`);
-      videoRef = { sha: await uploadBlob(video, video.type, video.name) };
-      tick();
-      if (!sheets.length) sheets.push({ sha: posterSha });
-    }
-
-    log('committing…');
-    const out = await post({
-      action: 'commit',
-      title: $('title').value.trim(),
-      label: $('label').value.trim(),
-      sheets,
-      video: videoRef,
-      posterSha,
-    });
-    bar.style.width = '100%';
-    log(`committed ${out.commit.slice(0, 7)} as "${out.id}" — ${out.files} files`, 'ok');
-    log('Vercel is rebuilding. It will be on the wall shortly.', 'ok');
-  } catch (err) {
-    log(err.message, 'err');
-    bar.style.width = '0';
-  } finally {
-    $('go').disabled = false;
-  }
-});
-
-/* ---- notes editor ---- */
-
-const KINDS = ['note', 'index', 'sticky', 'receipt'];
-let notes = [];
-
-const showTab = (which) => {
-  const art = which === 'art';
-  $('panel-art').hidden = !art;
-  $('panel-notes').hidden = art;
-  $('tab-art').classList.toggle('on', art);
-  $('tab-notes').classList.toggle('on', !art);
-  $('tab-art').setAttribute('aria-selected', String(art));
-  $('tab-notes').setAttribute('aria-selected', String(!art));
-};
-$('tab-art').addEventListener('click', () => showTab('art'));
-$('tab-notes').addEventListener('click', () => showTab('notes'));
-
-// Paragraphs are edited as one textarea split on blank lines, which is how people
-// actually write, rather than as a list of separate fields.
-const bodyToText = (body) => (body ?? []).join('\n\n');
-const textToBody = (text) => String(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-
-const linksToText = (links) => (links ?? []).map((l) => `${l.label} | ${l.href}`).join('\n');
-const textToLinks = (text) => String(text).split('\n').map((line) => {
-  const i = line.indexOf('|');
-  if (i < 0) return null;
-  const label = line.slice(0, i).trim();
-  const href = line.slice(i + 1).trim();
-  return label && href ? { label, href } : null;
-}).filter(Boolean);
-
-function renderNotes() {
-  const host = $('notes');
-  host.innerHTML = '';
-
-  notes.forEach((note, i) => {
-    const card = document.createElement('div');
-    card.className = 'note-card';
-
-    const kinds = KINDS.map((k) =>
-      `<option value="${k}"${k === (note.kind ?? 'note') ? ' selected' : ''}>${k}</option>`).join('');
-
-    card.innerHTML = `
-      <div class="note-head">
-        <div class="row" style="flex:1">
-          <input type="text" class="title" value="" placeholder="title">
-          <select class="kind">${kinds}</select>
-        </div>
-        <div>
-          <button class="mv up" title="move up">↑</button>
-          <button class="mv down" title="move down">↓</button>
-          <button class="del">remove</button>
+      <div class="field"><label for="title">title</label><input id="title" type="text" placeholder="what this is called"></div>
+      <div class="field"><label for="label">label — shown on the back of the piece</label><textarea id="label" style="min-height:70px"></textarea></div>
+      <div class="field">
+        <label>files</label>
+        <div class="drop" id="drop">
+          <p>drop files here, or click to choose</p>
+          <input id="file" type="file" accept="image/*,video/mp4,video/quicktime" multiple hidden>
         </div>
       </div>
-      <label>body — blank line between paragraphs</label>
-      <textarea class="body"></textarea>
-      <label>links — one per line, <code>label | https://…</code></label>
-      <textarea class="links" style="min-height:56px"></textarea>`;
+      <div id="thumbs"></div>
+      <div class="progress"><span id="prog"></span></div>
+      <button id="go" class="primary" disabled style="width:auto">upload</button>
+    </section>
 
-    // Values are assigned rather than interpolated so a quote or angle bracket in
-    // Medi's writing cannot break out of the markup.
-    card.querySelector('.title').value = note.title ?? '';
-    card.querySelector('.body').value = bodyToText(note.body);
-    card.querySelector('.links').value = linksToText(note.links);
+    <div id="log"></div>
+  </main>
+</div>
 
-    const sync = () => {
-      note.title = card.querySelector('.title').value;
-      note.kind = card.querySelector('.kind').value;
-      note.body = textToBody(card.querySelector('.body').value);
-      note.links = textToLinks(card.querySelector('.links').value);
-    };
-    for (const el of card.querySelectorAll('input, textarea, select')) {
-      el.addEventListener('input', sync);
-      el.addEventListener('change', sync);
-    }
+<div class="bar" id="savebar">
+  <span class="count" id="pending"></span>
+  <button class="primary" id="save-pieces">save changes</button>
+  <button class="ghost" id="discard">discard</button>
+</div>
 
-    card.querySelector('.del').addEventListener('click', () => {
-      notes.splice(i, 1);
-      renderNotes();
-    });
-    card.querySelector('.up').addEventListener('click', () => {
-      if (i === 0) return;
-      [notes[i - 1], notes[i]] = [notes[i], notes[i - 1]];
-      renderNotes();
-    });
-    card.querySelector('.down').addEventListener('click', () => {
-      if (i === notes.length - 1) return;
-      [notes[i + 1], notes[i]] = [notes[i], notes[i + 1]];
-      renderNotes();
-    });
-
-    host.appendChild(card);
-  });
-
-  $('add-note').hidden = false;
-  $('save-notes').hidden = false;
-}
-
-$('load-notes').addEventListener('click', async () => {
-  $('log').innerHTML = '';
-  try {
-    if (!$('key').value) throw new Error('password first');
-    const res = await fetch('/api/notes', { headers: { 'x-medi-key': $('key').value } });
-    const json = await res.json().catch(() => ({ error: `http ${res.status}` }));
-    if (!res.ok) throw new Error(json.error ?? `http ${res.status}`);
-    notes = json.notes ?? [];
-    renderNotes();
-    log(`loaded ${notes.length} notes`, 'ok');
-  } catch (err) {
-    log(err.message, 'err');
-  }
-});
-
-$('add-note').addEventListener('click', () => {
-  notes.push({ id: '', kind: 'note', title: '', body: [], links: [] });
-  renderNotes();
-});
-
-$('save-notes').addEventListener('click', async () => {
-  $('log').innerHTML = '';
-  $('save-notes').disabled = true;
-  try {
-    const res = await fetch('/api/notes', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-medi-key': $('key').value },
-      body: JSON.stringify({ notes }),
-    });
-    const json = await res.json().catch(() => ({ error: `http ${res.status}` }));
-    if (!res.ok) throw new Error(json.error ?? `http ${res.status}`);
-    log(`saved ${json.count} notes as ${json.commit.slice(0, 7)}`, 'ok');
-    log('Vercel is rebuilding.', 'ok');
-  } catch (err) {
-    log(err.message, 'err');
-  } finally {
-    $('save-notes').disabled = false;
-  }
-});
-
-</script>
+<script type="module" src="js/dashboard.js"></script>
 </body>
 </html>

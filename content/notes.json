@@ -1,6 +1,5 @@
 {
   "_comment": "Notes pinned to the wall and rendered on notes.html. Edit freely — this file is the only place the words live. `kind` picks the paper: note, index, sticky, receipt. Order here is the order they appear.",
-
   "notes": [
     {
       "id": "welcome",
@@ -22,17 +21,24 @@
         "I will tell you a price and a turnaround before either of us commits to anything."
       ],
       "links": [
-        { "label": "@tiredmedi on Instagram", "href": "https://www.instagram.com/tiredmedi/" },
-        { "label": "buy me a coffee", "href": "https://buymeacoffee.com/hananseifu1" }
+        {
+          "label": "@tiredmedi on Instagram",
+          "href": "https://www.instagram.com/tiredmedi/"
+        },
+        {
+          "label": "buy me a coffee",
+          "href": "https://buymeacoffee.com/hananseifu1"
+        }
       ]
     },
     {
       "id": "process",
       "kind": "sticky",
-      "title": "the slider",
+      "title": "how this works",
       "body": [
-        "Drag the un-render slider and the whole wall walks itself backwards — finished, then flat colour, then lineart, then a rough underdrawing.",
-        "Be honest about this one: most of those stages are reconstructed by the site, not scans of my actual layers. The pieces marked 'actual wip' are the real thing."
+        "Everything here is taped to a wall. Drag a piece and it peels; throw it and it slides off somewhere and stays there.",
+        "Pieces with a play marker were drawn on video — they loop where they hang, and the full timelapse is on the back. Turn any piece over by double-clicking it.",
+        "Rewrite me. This is a draft written by someone who is not Medi."
       ]
     },
     {

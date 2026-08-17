@@ -21,8 +21,7 @@ export function seedOf(str) {
 }
 
 // Chronological left-to-right in loose rows, oldest at the left. Reading the wall
-// horizontally is reading the artist's timeline, which is why the scrubber and the
-// wall agree with each other.
+// horizontally is reading the artist's timeline.
 export function defaultLayout(pieces, { columns = 8 } = {}) {
   const layout = {};
 

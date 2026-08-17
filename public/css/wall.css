@@ -29,12 +29,37 @@ html, body {
   inset: 0;
   touch-action: none;
   cursor: grab;
+}
+
+/* The desk surface paints on the body so the stroke layer can sit above it and
+   still be underneath everything on the wall. */
+body {
   background:
     repeating-linear-gradient(0deg, transparent 0 39px, rgba(0,0,0,.035) 39px 40px),
     repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,0,0,.035) 39px 40px),
     radial-gradient(circle at 30% 20%, #e6e0d1, var(--desk) 60%, var(--desk-deep));
+  background-attachment: fixed;
 }
 #viewport.panning { cursor: grabbing; }
+
+/* Strokes sweeping the page behind the wall. Fixed to the viewport rather than
+   parented to the world, so panning does not drag them around, and pointer-events
+   off so they never intercept a drag. */
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.strokes {
+  width: 100%;
+  height: 100%;
+  display: block;
+  stroke: var(--ink);
+}
+
+#viewport { z-index: 1; background-color: transparent; }
 
 #world {
   position: absolute;
@@ -172,14 +197,10 @@ html, body {
   user-select: none;
   -webkit-user-drag: none;
 }
-.l-flat, .l-edge { opacity: 0; }
-.l-edge { background: var(--paper); }
-
 /* The preview loop sits above the still and fades in once it is actually playing,
    so a piece never flashes a black video element while the first frame decodes. */
 .l-preview { opacity: 0; transition: opacity .35s; z-index: 2; }
 .piece.previewing .l-preview { opacity: 1; }
-.piece.scrubbing .l-preview { opacity: 0; }
 
 /* A quiet marker that this piece is a process video, so it reads as playable
    before the budget reaches it. */
@@ -196,11 +217,6 @@ html, body {
   transition: opacity .2s;
 }
 .piece.previewing .layers::after { opacity: 0; }
-
-.piece.warped .layers {
-  filter: url(#wobble);
-  opacity: calc(1 - var(--warp) * .18);
-}
 
 .tape {
   position: absolute;
@@ -228,16 +244,6 @@ html, body {
   z-index: 6;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0,0,0,.3);
-}
-
-.wip-flag {
-  position: absolute;
-  left: 8px; bottom: 8px;
-  font-size: 11px;
-  padding: 2px 7px;
-  background: rgba(255,255,255,.9);
-  border-radius: 3px;
-  z-index: 6;
 }
 
 .eyes { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
@@ -301,17 +307,6 @@ html, body {
 .hud-top h1 { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: .01em; }
 .hud-top .sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
 
-.hud-scrub {
-  bottom: 16px; left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  width: min(440px, calc(100vw - 32px));
-}
-.hud-scrub input { flex: 1; accent-color: #8a4a2a; }
-#scrub-label { min-width: 92px; color: var(--ink-soft); }
 
 .hud-side { top: 16px; right: 16px; width: 178px; }
 #minimap {
@@ -383,10 +378,7 @@ body.failed .failed-only { display: grid; }
   .hud-side { display: none; }
   .hud-top .sub { display: none; }
   .hud-actions { flex-direction: row; gap: 14px; bottom: 64px; }
-  .hud-scrub { bottom: 12px; }
-  .hud-caption { bottom: 118px; }
-}
-
+  
 @media (prefers-reduced-motion: reduce) {
   .jit { animation: none; }
   .pupil { transition: none; }

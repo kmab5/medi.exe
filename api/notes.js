@@ -70,7 +70,11 @@ function validate(notes) {
     }
     if (links.length > MAX_LINKS) return { error: `note ${i + 1}: too many links` };
 
-    clean.push({ id, kind, title, body, ...(links.length ? { links } : {}) });
+    clean.push({
+      id, kind, title, body,
+      ...(links.length ? { links } : {}),
+      ...(raw.hidden === true ? { hidden: true } : {}),
+    });
   }
 
   return { notes: clean };

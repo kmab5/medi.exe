@@ -1,5 +1,5 @@
 // A written note pinned to the wall. Deliberately implements the same surface as
-// Piece — el, box, place, worldBox, load, setScrub, setPreviewPlaying — so the
+// Piece — el, box, place, worldBox, load, setPreviewPlaying — so the
 // physics, drag binding and culling in wall.js do not need to know which is which.
 
 import { seedOf } from './layout.js';
@@ -73,10 +73,9 @@ export class Note {
     return { x: this.box.x, y: this.box.y, w: this.box.w, h: this.box.h };
   }
 
-  // Notes have nothing to lazy-load, nothing to un-render, no video and no stack.
-  // Implemented as no-ops so callers never have to branch on type.
+  // Notes have nothing to lazy-load, no video and no stack. Implemented as no-ops
+  // so callers never have to branch on type.
   load() {}
-  setScrub() {}
   setPreviewPlaying() {}
   riffle() {}
   flip() {}

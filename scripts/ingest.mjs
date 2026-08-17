@@ -158,7 +158,7 @@ async function main() {
   }
 
   await rm(OUT, { recursive: true, force: true });
-  for (const d of ['', 'video', 'wips/_unpaired', 'margin']) {
+  for (const d of ['', 'video', 'margin']) {
     await mkdir(join(OUT, d), { recursive: true });
   }
 
@@ -220,10 +220,6 @@ async function main() {
     for (const n of names.slice(1)) meta[n] = { child: true };
   }
 
-  const wips = (await entriesOf(join(SRC, 'highlights', 'WIP')))
-    .filter((f) => !f.dir && IMAGE_EXT.has(extname(f.name).toLowerCase()));
-  for (const f of wips) await copyFile(f.path, join(OUT, 'wips', '_unpaired', f.name));
-
   const doodles = (await entriesOf(join(SRC, 'highlights', 'OP Doodles')))
     .filter((f) => !f.dir && IMAGE_EXT.has(extname(f.name).toLowerCase()));
   for (const f of doodles) await copyFile(f.path, join(OUT, 'margin', f.name));
@@ -236,7 +232,6 @@ async function main() {
   console.log(`ingested ${parents.length} pieces / ${sheetCount} sheets / ${videoCount} timelapses`);
   console.log(`  dates recovered for ${dates.length} of ${parents.length}`);
   if (dates.length) console.log(`  ${dates[0].slice(0, 10)} to ${dates[dates.length - 1].slice(0, 10)}`);
-  console.log(`  ${wips.length} wips -> ${OUT}/wips/_unpaired/`);
   console.log(`  ${doodles.length} doodles -> ${OUT}/margin/`);
   console.log(`\nadd "title" and "label" to entries in ${OUT}/meta.json to name pieces`);
 }

@@ -11,8 +11,7 @@ at any size worth seeing it at.
 The replacement is a single infinite canvas — a desk surface with ~51 drawings taped to
 it. Visitors pan and zoom. Every piece is a physical sheet of paper: it can be grabbed,
 peeled off its tape, swung, flicked across the wall, and flipped over. One global slider
-un-renders every piece on the wall simultaneously, back through flat colour to lineart to
-a wobbling underdrawing.
+was, at one point, an un-render slider that walked every piece back to its underdrawing.
 
 Nothing on the wall is ever perfectly still.
 
@@ -69,7 +68,6 @@ Sub-units:
 - `camera` — pan, zoom, clamp, minimap sync. Knows nothing about pieces.
 - `piece` — one sheet of paper. Owns its layers, its tape hinge, its physics body, its
   front/back flip state.
-- `unrender` — the scrubber shader and the single global `t` uniform driving it.
 - `physics` — damped springs for tape hinge, drag, toss, settle. Hand-rolled, ~150 lines.
   Not Matter.js: the only interactions are drag, throw, and rest. No gravity acts on
   translation — the wall is a vertical surface with no floor, so a thrown piece slides
@@ -90,24 +88,13 @@ Placement-only. Visitors move and stick the artist's own stickers; they cannot u
 images or draw freehand. This removes the moderation burden almost entirely while keeping
 the play, and is a deliberate v1 scope decision rather than a permanent one.
 
-## The un-render
+## The un-render — removed
 
-Four stages, cross-faded by one slider driving a `t` uniform in the range 0–1.
-
-| t | Stage | Source |
-|---|---|---|
-| 1.00 | final render | `final.webp` |
-| 0.66 | flat colour, shading gone | `flat.webp` |
-| 0.33 | lineart on paper white | `edge.webp` |
-| 0.00 | underdrawing | `edge.webp` + displacement warp, opacity down |
-
-Adjacent stages cross-fade; the warp amplitude ramps in only below t=0.33, so the lines
-go uncertain rather than the whole image blurring.
-
-**This is an effect, not a record of process.** Pieces with real WIP files use them
-instead and carry a visible `actual wip` marker. The two paths share one interface, so a
-piece can be upgraded from synthetic to real by dropping files in a folder. The wall must
-never claim the synthetic version is the artist's process.
+This shipped and was then cut at the artist's request, along with the `flat` and
+`edge` layers it needed and the WIP pairing that fed it. The build no longer derives
+them. Kept here because the reasoning is still instructive: the stages were
+synthesised by edge detection over a colour-quantised copy, which is an effect rather
+than a record of process, and that tension was never fully resolved.
 
 ## Piece backs
 

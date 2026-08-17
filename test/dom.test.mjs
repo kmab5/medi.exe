@@ -77,45 +77,20 @@ test('every piece in the real manifest constructs', async () => {
 test('loading a piece attaches its layer images and back matter', async () => {
   const { Piece } = await import('../public/js/piece.js');
   const m = await manifest();
-  const data = m.pieces.find((p) => p.layers.flat && p.layers.edge);
+  const data = m.pieces[0];
 
   const piece = new Piece(data, { x: 0, y: 0, w: 300, h: 400, rot: 0 });
   piece.load();
 
   const layers = piece.el.querySelectorAll('.layer');
-  assert.equal(layers.length, 3, 'expected final, flat and edge');
+  assert.equal(layers.length, 1, 'expected the final image only');
   assert.ok(piece.el.querySelector('.back-title').textContent.length > 0);
 
   // Loading twice must not duplicate the images.
   piece.load();
-  assert.equal(piece.el.querySelectorAll('.layer').length, 3);
+  assert.equal(piece.el.querySelectorAll('.layer').length, 1);
 });
 
-test('scrubbing drives layer opacity across the full range', async () => {
-  const { Piece } = await import('../public/js/piece.js');
-  const m = await manifest();
-  const data = m.pieces.find((p) => p.layers.flat && p.layers.edge);
-  const piece = new Piece(data, { x: 0, y: 0, w: 300, h: 400, rot: 0 });
-  piece.load();
-
-  piece.setScrub(1);
-  assert.equal(Number(piece.flatImg.style.opacity), 0, 'finished state shows no flat layer');
-  assert.equal(Number(piece.edgeImg.style.opacity), 0);
-  assert.ok(!piece.el.classList.contains('warped'));
-
-  piece.setScrub(0);
-  assert.equal(Number(piece.edgeImg.style.opacity), 1, 'underdrawing shows the edge layer');
-  assert.ok(piece.el.classList.contains('warped'), 'wobble should engage at the far end');
-
-  // Nothing should ever leave the 0..1 range at any point on the slider.
-  for (let t = 0; t <= 1.0001; t += 0.05) {
-    piece.setScrub(t);
-    for (const img of [piece.flatImg, piece.edgeImg]) {
-      const o = Number(img.style.opacity);
-      assert.ok(o >= 0 && o <= 1, `opacity ${o} out of range at t=${t.toFixed(2)}`);
-    }
-  }
-});
 
 test('a piece with eyes builds pupils that move when looked at', async () => {
   const { Piece } = await import('../public/js/piece.js');
@@ -166,19 +141,6 @@ test('flipping toggles state and riffling cycles an album stack', async () => {
   assert.equal(stacked.finalImg.getAttribute('src'), first);
 });
 
-test('scrub layers are hidden on non-primary sheets', async () => {
-  const { Piece } = await import('../public/js/piece.js');
-  const m = await manifest();
-  const album = m.pieces.find((p) => p.stack.length > 0);
-  const piece = new Piece(album, { x: 0, y: 0, w: 300, h: 400, rot: 0 });
-  piece.load();
-
-  piece.riffle();
-  assert.equal(piece.flatImg.style.display, 'none', 'stale underdrawing would show through');
-  piece.riffle();
-  while (piece.sheetIndex !== 0) piece.riffle();
-  assert.equal(piece.flatImg.style.display, '');
-});
 
 test('every piece gets a movement personality with real amplitude', async () => {
   const { Piece } = await import('../public/js/piece.js');
@@ -230,23 +192,6 @@ test('video pieces build a preview layer and non-video pieces do not', async () 
   assert.equal(np.previewVideo, undefined);
 });
 
-test('scrubbing away from finished stops preview playback', async () => {
-  const { Piece } = await import('../public/js/piece.js');
-  const m = await manifest();
-  const p = new Piece(m.pieces.find((x) => x.preview), { x: 0, y: 0, w: 320, h: 400, rot: 0 });
-  p.load();
-
-  p.setScrub(1);
-  assert.ok(!p.scrubbed);
-  p.setScrub(0.5);
-  assert.ok(p.scrubbed, 'should register as scrubbed');
-  assert.ok(p.el.classList.contains('scrubbing'));
-
-  // setPreviewPlaying must refuse while scrubbed rather than start a video that
-  // contradicts the un-rendered image beneath it.
-  p.setPreviewPlaying(true);
-  assert.ok(!p.el.classList.contains('previewing'));
-});
 
 test('notes render their writing and links', async () => {
   const { Note } = await import('../public/js/note.js');
@@ -278,10 +223,10 @@ test('notes escape html rather than injecting it', async () => {
 test('notes implement the piece interface so the wall need not branch', async () => {
   const { Note } = await import('../public/js/note.js');
   const note = new Note({ id: 'x', title: 't', body: ['b'] }, { x: 0, y: 0, w: 300, h: 200, rot: 0 });
-  for (const method of ['place', 'worldBox', 'load', 'setScrub', 'setPreviewPlaying', 'riffle', 'flip', 'lookAt']) {
+  for (const method of ['place', 'worldBox', 'load', 'setPreviewPlaying', 'riffle', 'flip', 'lookAt']) {
     assert.equal(typeof note[method], 'function', `Note is missing ${method}`);
   }
-  assert.doesNotThrow(() => { note.setScrub(0.5); note.load(); note.riffle(); note.lookAt(0, 0); });
+  assert.doesNotThrow(() => { note.load(); note.riffle(); note.lookAt(0, 0); });
 });
 
 test('notes are laid out clear of the artwork', async () => {
@@ -298,4 +243,76 @@ test('notes are laid out clear of the artwork', async () => {
       assert.ok(!overlaps, 'a note overlaps artwork');
     }
   }
+});
+
+test('the un-render is gone from the manifest, the markup and the styles', async () => {
+  const m = await manifest();
+  for (const p of m.pieces) {
+    assert.equal(p.layers.flat, undefined, `${p.id} still carries a flat layer`);
+    assert.equal(p.layers.edge, undefined, `${p.id} still carries an edge layer`);
+  }
+
+  const html = await readFile('public/index.html', 'utf8');
+  assert.ok(!html.includes('hud-scrub'), 'the scrub bar is still in the markup');
+  assert.ok(!html.includes('wobble'), 'the displacement filter is still defined');
+
+  const css = await readFile('public/css/wall.css', 'utf8');
+  assert.ok(!/\.l-flat|\.l-edge|\.warped/.test(css), 'scrub styles remain');
+});
+
+test('background strokes draw a path and clean themselves up', async () => {
+  const { Strokes } = await import('../public/js/strokes.js');
+
+  // jsdom has no SVG geometry, so getTotalLength is absent. Stub it to a plausible
+  // length; the point of the test is the lifecycle, not the measurement.
+  dom.window.SVGElement.prototype.getTotalLength = function () { return 900; };
+  const animations = [];
+  dom.window.Element.prototype.animate = function () {
+    const handlers = {};
+    const anim = {
+      addEventListener(name, fn) { handlers[name] = fn; },
+      finish() { handlers.finish?.(); },
+    };
+    animations.push(anim);
+    return anim;
+  };
+
+  const host = dom.window.document.createElement('div');
+  const strokes = new Strokes(host, { reduced: false });
+
+  assert.ok(host.querySelector('svg.strokes'), 'no stroke layer created');
+
+  strokes.spawn();
+  assert.equal(strokes.svg.querySelectorAll('path').length, 1);
+  assert.equal(strokes.live, 1);
+
+  const d = strokes.svg.querySelector('path').getAttribute('d');
+  assert.match(d, /^M [-\d.]+ [-\d.]+/, 'path does not start with a move');
+  assert.ok(d.includes('Q'), 'path should curve rather than run straight');
+
+  // When the animation finishes the node must go, or the document accumulates
+  // thousands of dead paths over a long session.
+  animations[0].finish();
+  assert.equal(strokes.svg.querySelectorAll('path').length, 0);
+  assert.equal(strokes.live, 0);
+
+  strokes.stop();
+});
+
+test('strokes respect reduced motion and a concurrency cap', async () => {
+  const { Strokes } = await import('../public/js/strokes.js');
+  dom.window.SVGElement.prototype.getTotalLength = function () { return 900; };
+  dom.window.Element.prototype.animate = function () {
+    return { addEventListener() {} };
+  };
+
+  const quiet = new Strokes(dom.window.document.createElement('div'), { reduced: true });
+  quiet.start();
+  assert.equal(quiet.timer, null, 'reduced motion should schedule nothing');
+  quiet.stop();
+
+  const busy = new Strokes(dom.window.document.createElement('div'), { reduced: false });
+  for (let i = 0; i < 12; i++) busy.spawn();
+  assert.ok(busy.live <= 3, `concurrency cap breached: ${busy.live} live`);
+  busy.stop();
 });

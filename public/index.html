@@ -12,14 +12,7 @@
 </head>
 <body>
 
-<svg class="defs" aria-hidden="true" focusable="false">
-  <filter id="wobble" x="-8%" y="-8%" width="116%" height="116%">
-    <!-- The underdrawing stage. Turbulence drives a displacement map, so lines go
-         uncertain the way a rough pencil pass does, rather than simply blurring. -->
-    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.021" numOctaves="2" seed="7" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
+<div id="backdrop" aria-hidden="true"></div>
 
 <div id="viewport">
   <div id="world">
@@ -32,12 +25,6 @@
   <h1>medi</h1>
   <p class="sub"><span id="count">—</span> pieces, taped to a wall. drag them. throw them.</p>
 </header>
-
-<div class="hud hud-scrub">
-  <label for="scrub">un-render</label>
-  <input id="scrub" type="range" min="0" max="1000" value="1000" step="1" aria-describedby="scrub-label">
-  <span id="scrub-label">finished</span>
-</div>
 
 <aside class="hud hud-side">
   <div id="minimap" aria-hidden="true"></div>

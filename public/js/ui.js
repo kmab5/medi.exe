@@ -1,20 +1,7 @@
-// Chrome around the wall: the scrub slider, the minimap, the sticker sheet, and
-// sound. Each is independent and degrades to nothing if its element is absent.
+// Chrome around the wall: the minimap, the sticker sheet, and sound. Each is
+// independent and degrades to nothing if its element is absent.
 
 import { store } from './store.js';
-
-export function bindScrubber(el, onChange) {
-  const label = document.getElementById('scrub-label');
-  const names = ['underdrawing', 'lineart', 'flat colour', 'finished'];
-  const update = () => {
-    const t = Number(el.value) / 1000;
-    onChange(t);
-    if (label) label.textContent = names[Math.min(3, Math.floor(t * 3.999))];
-  };
-  el.addEventListener('input', update);
-  update();
-  return update;
-}
 
 export class Minimap {
   constructor(el, { pieces, bounds, camera, onJump }) {

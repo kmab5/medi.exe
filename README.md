@@ -51,44 +51,14 @@ One flat image per piece goes in. The build step derives:
 | Layer | How | Used by |
 |---|---|---|
 | `final` | resize | the wall at rest |
-| `flat` | 10-colour palette quantisation | scrub stage 2 |
-| `edge` | Sobel over the flat map | scrub stages 3 and 4 |
 | `cutout` | alpha-trim to content | the sticker sheet |
 | `thumb` | 72px | the minimap |
 
 Timelapse videos are copied from `source/video/` into the build output and their
 manifest paths rewritten, so the piece backs resolve in production.
 
-Two details that matter. Edges run over the *flat* map, not the original — shading
-gradients in the original produce phantom contours through the middle of a face, and
-quantising first removes them. And the flat map uses palette quantisation rather than
-per-channel banding, because banding each channel independently shifts hue badly:
-brown hair goes olive, pink paper goes yellow.
-
-`EDGE_THRESHOLD` and `FLAT_COLOURS` sit at the top of `scripts/build.mjs`. The
-threshold is tuned so paper grain and soft airbrush stay out while inked contours
-stay in. Graph-paper backgrounds are the case most likely to need a nudge.
-
-## Real WIPs vs the un-render
-
-The scrub stages are synthesised. **They are an effect, not a record of process**, and
-the wall never claims otherwise.
-
-Where you have genuine WIP files, they take over. Put them in
-`source/wips/<piece-id>/` and rebuild; that piece gets an `actual wip` marker and
-uses your real stages. The 7 files from your WIP highlight are sitting in
-`source/wips/_unpaired/` — nothing in the export says which finished piece each
-belongs to, so pairing them is a manual move.
-
-## Notes
-
-Everything Medi writes lives in `content/notes.json`. Edit that file and the words
-appear in two places: pinned to the wall as paper notes in a column beside the
-artwork, and on `notes.html`, which is a properly typeset page rather than a
-fallback. `kind` picks the paper stock — `note`, `index`, `sticky`, `receipt`.
-
-The seeded notes are drafts written by someone who is not Medi. The commissions and
-Instagram details are accurate; the voice is a placeholder and should be replaced.
+The un-render scrubber was removed, and with it the `flat` and `edge` layers it
+needed. The derivation code is in git history if it is ever wanted back.
 
 ## Video on the wall
 
@@ -131,6 +101,24 @@ Environment variables:
 | `GITHUB_TOKEN` | Fine-grained token with **contents: read and write** on this repo only. |
 | `GITHUB_REPO` | `owner/name`. A clone URL is accepted too and normalised. |
 | `GITHUB_BRANCH` | Defaults to `main` |
+
+### The dashboard
+
+Signing in opens three panels.
+
+**Pieces** lists everything with a thumbnail and an on/off switch. Switching a piece
+off takes it down from the wall and the list page. It is not a delete — the image
+stays in the repo and the flag stays in `meta.json`, so it comes back with one click.
+Changes batch up and commit together when you press save.
+
+**Notes** edits `content/notes.json`, with the same on/off switch per note.
+
+**Add new** is the uploader.
+
+The password is held in sessionStorage for the tab and sent as a header on every
+request. It is not a session token and grants nothing on its own: each endpoint
+checks it independently, so a forged signed-in state in the browser buys access to
+nothing.
 
 ### Editing notes
 
@@ -177,6 +165,12 @@ The un-render is four stacked images cross-faded by opacity, with an SVG
 `feDisplacementMap` ramping in over the last third. An earlier draft used Pixi and a
 WebGL shader; the DOM version produces the same result with no dependency and
 degrades instead of dying when WebGL is unavailable.
+
+Background strokes sweep the page behind the wall, drawing themselves in and then
+undrawing from the same end. They are screen-space, not world-space — fixed to the
+viewport and unaffected by pan and zoom — so they read as someone sketching over the
+page rather than as marks living on the wall. Three at most at once, and none at all
+under `prefers-reduced-motion`.
 
 Movement is five seeded personalities — sway, bob, flutter, lean, shrug — each with
 its own amplitude, period, phase and transform origin, on `steps(1)` timing so motion

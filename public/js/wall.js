@@ -7,8 +7,9 @@ import { World, Body, Velocity } from './physics.js';
 import { Piece } from './piece.js';
 import { Note } from './note.js';
 import { defaultLayout, marginLayout, noteLayout, boundsOf } from './layout.js';
-import { bindScrubber, Minimap, Stickers, Sound } from './ui.js';
+import { Minimap, Stickers, Sound } from './ui.js';
 import { store } from './store.js';
+import { Strokes } from './strokes.js';
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -20,7 +21,7 @@ const marginLayer = document.getElementById('margin-layer');
 const state = {
   // `pieces` is everything physical on the wall, notes included — they share an
   // interface so physics, dragging and culling treat them identically. `artwork`
-  // is the subset that has layers to scrub.
+  // is the subset that is a drawing rather than writing.
   pieces: [],
   artwork: [],
   byId: new Map(),
@@ -96,11 +97,6 @@ async function boot() {
     isBackground: (target) => !target.closest('.piece') && !target.closest('.sticker'),
   });
 
-  const applyScrub = bindScrubber(document.getElementById('scrub'), (t) => {
-    for (const p of state.artwork) p.setScrub(t);
-    if (cameraRef) updatePreviews(cameraRef);
-  });
-
   const stickers = new Stickers({
     sheetEl: document.getElementById('sticker-sheet'),
     layerEl: stickerLayer,
@@ -120,9 +116,13 @@ async function boot() {
   physics.start();
 
   cull(camera);
-  applyScrub();
   if (!reduced) startAmbient(camera);
   wireChrome(camera, sound, bounds);
+
+  // Background strokes live outside the world transform, so they sweep the page
+  // rather than the wall and are unaffected by pan and zoom.
+  const strokes = new Strokes(document.getElementById('backdrop'), { reduced });
+  strokes.start();
 
   document.body.classList.add('booted');
   document.getElementById('count').textContent = manifest.count;
@@ -256,7 +256,7 @@ function updatePreviews(camera) {
 
   const candidates = [];
   for (const p of state.artwork) {
-    if (!p.previewVideo || p.scrubbed) continue;
+    if (!p.previewVideo) continue;
     const s = camera.worldToScreen(p.box.x + p.box.w / 2, p.box.y + p.box.h / 2);
     const onScreen = s.x > -100 && s.x < vw + 100 && s.y > -100 && s.y < vh + 100;
     const bigEnough = p.box.w * camera.scale >= PREVIEW_MIN_PX;
