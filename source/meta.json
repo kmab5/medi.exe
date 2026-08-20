@@ -746,7 +746,8 @@
     "timelapse": null,
     "preview": null,
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "db-uemtd--2.jpg": {
     "child": true
@@ -772,7 +773,8 @@
     "timelapse": null,
     "preview": null,
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "dbdvfjbd--2.jpg": {
     "child": true
@@ -800,7 +802,8 @@
     "timelapse": null,
     "preview": null,
     "title": "",
-    "label": ""
+    "label": "",
+    "hidden": true
   },
   "dbtrq9yj--2.jpg": {
     "child": true
