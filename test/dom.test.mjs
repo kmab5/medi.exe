@@ -312,7 +312,35 @@ test('strokes respect reduced motion and a concurrency cap', async () => {
   quiet.stop();
 
   const busy = new Strokes(dom.window.document.createElement('div'), { reduced: false });
-  for (let i = 0; i < 12; i++) busy.spawn();
-  assert.ok(busy.live <= 3, `concurrency cap breached: ${busy.live} live`);
+  for (let i = 0; i < 30; i++) busy.spawn();
+  assert.ok(busy.live <= 9, `concurrency cap breached: ${busy.live} live`);
   busy.stop();
+});
+
+test('strokes produce every kind of mark, and all of them are valid paths', async () => {
+  const { Strokes } = await import('../public/js/strokes.js');
+  dom.window.SVGElement.prototype.getTotalLength = function () { return 600; };
+  dom.window.Element.prototype.animate = function () { return { addEventListener() {} }; };
+
+  const s = new Strokes(dom.window.document.createElement('div'), { reduced: false });
+
+  for (const kind of ['sweep', 'arc', 'hatch', 'loop']) {
+    s.svg.innerHTML = '';
+    s.live = 0;
+    s.spawn(kind);
+    const path = s.svg.querySelector('path');
+    assert.ok(path, `${kind} produced no path`);
+    const d = path.getAttribute('d');
+    assert.match(d, /^M -?[\d.]+ -?[\d.]+/, `${kind} path malformed: ${d.slice(0, 40)}`);
+    assert.ok(!/NaN|undefined|Infinity/.test(d), `${kind} path contains a bad number`);
+    const opacity = Number(path.getAttribute('opacity'));
+    assert.ok(opacity > 0 && opacity < 0.3, `${kind} opacity ${opacity} would compete with the art`);
+  }
+
+  // pick() must be able to return each kind, or a branch is dead code.
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) seen.add(s.pick());
+  assert.deepEqual([...seen].sort(), ['arc', 'hatch', 'loop', 'sweep']);
+
+  s.stop();
 });

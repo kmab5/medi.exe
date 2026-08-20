@@ -169,8 +169,10 @@ degrades instead of dying when WebGL is unavailable.
 Background strokes sweep the page behind the wall, drawing themselves in and then
 undrawing from the same end. They are screen-space, not world-space — fixed to the
 viewport and unaffected by pan and zoom — so they read as someone sketching over the
-page rather than as marks living on the wall. Three at most at once, and none at all
-under `prefers-reduced-motion`.
+page rather than as marks living on the wall. Four kinds of mark — a page-spanning sweep, a
+broad arc, a short bowed hatch, and an open circular scribble — arriving in bursts of
+one to three rather than evenly spaced, because regular spacing reads as a
+screensaver. Nine at most at once, and none at all under `prefers-reduced-motion`.
 
 Movement is five seeded personalities — sway, bob, flutter, lean, shrug — each with
 its own amplitude, period, phase and transform origin, on `steps(1)` timing so motion
@@ -218,23 +220,50 @@ is off or the wall fails to boot.
 `prefers-reduced-motion` disables jitter, drift and eye tracking. The scrubber and the
 physics stay, because both are user-initiated.
 
+## Build cache
+
+The first build derives 149 sheets and takes a minute or two. Every build after that
+takes well under a second, because **`public/art/` is committed and is the cache**.
+
+Vercel clones a fresh checkout on every deploy, so anything not in git is rebuilt from
+scratch. With the derived layers in the repo, a deploy that only toggled a piece's
+visibility or edited a note does no image work at all — it rewrites the manifest and
+the two generated pages and stops.
+
+Each sheet is keyed on a hash of its source bytes plus `SETTINGS_VERSION`. A hit needs
+both a matching hash and the output files still present on disk, so a cache that has
+been half-deleted repairs itself rather than emitting a manifest full of dead links.
+
+| Change | What rebuilds |
+|---|---|
+| Hide or show a piece | nothing — manifest only |
+| Edit a note | nothing — manifest only |
+| Upload one piece | that piece |
+| Replace a source image | that sheet |
+| Bump `SETTINGS_VERSION` | everything |
+| Delete a source image | nothing; its output is pruned |
+
+`npm run build -- --force` ignores the cache. Bump `SETTINGS_VERSION` at the top of
+`scripts/build.mjs` whenever the derivation changes — a different size or quality
+setting will not otherwise propagate to files that are already cached.
+
+Video is the one thing not committed: it is copied straight out of `source/`, so
+committing it would duplicate 17MB to save 350ms.
+
 ## Deploying
 
 Push to Vercel. `vercel.json` sets the build command and serves `public/`.
 
-**`source/` is committed; `public/art/` is not.** The source images are the input the
-build needs, so they have to be in the repo for Vercel to build anything — an earlier
-version gitignored them and every deploy failed with "source not found". Everything
-under `public/art/` is derived and regenerated on each deploy, so committing it would
-just be churn.
+**Both `source/` and `public/art/` are committed.** The source images are the build's
+input, and the derived layers are its cache — see the section above. Only
+`public/art/video/`, `list.html` and `notes.html` are ignored, all three being
+regenerated in milliseconds.
 
 That keeps the promise intact: to add a drawing, drop a PNG in `source/`, commit, push.
 Vercel rebuilds.
 
-If you would rather not commit ~48MB of images, the build also accepts the opposite
-arrangement — commit a prebuilt `public/art/` instead and leave `source/` out, and the
-build step will detect the prebuilt manifest and skip. You lose the drop-a-PNG
-workflow.
+The build also accepts `source/` being absent entirely: it detects the prebuilt
+manifest and skips. You lose the drop-a-PNG workflow, but the site still deploys.
 
 For the shared sticker layer, install a Redis integration from the Vercel marketplace
 and the environment variables are wired automatically. Without it the wall still works;

@@ -1,14 +1,63 @@
 import sharp from 'sharp';
-import { readdir, readFile, writeFile, mkdir, rm, copyFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, rm, copyFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, extname, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { cpus } from 'node:os';
 
 const SRC = process.argv[2] ?? 'source';
 const OUT = process.argv[3] ?? 'public/art';
+const FORCE = process.argv.includes('--force');
 
 const SIZES = { final: 1440, cutout: 700, thumb: 72 };
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+
+// Bump this whenever the derivation changes — different sizes, different quality, a
+// new layer. Every cache entry keyed on the old value is then a miss, which is the
+// only way a settings change can be guaranteed to propagate.
+const SETTINGS_VERSION = 'v1-final1440-cutout700-thumb72-q86';
+
+const CACHE_FILE = '.cache.json';
+
+// Decoding an image to read its dimensions and dominant colour costs about as much
+// as re-encoding it, so the cache stores the derived metadata too. A cache hit then
+// does no image work at all.
+async function loadCache() {
+  if (FORCE) return {};
+  const path = join(OUT, CACHE_FILE);
+  if (!existsSync(path)) return {};
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8'));
+    if (parsed.settings !== SETTINGS_VERSION) {
+      console.log('build settings changed — rebuilding everything');
+      return {};
+    }
+    return parsed.sheets ?? {};
+  } catch {
+    return {};
+  }
+}
+
+const hashOf = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 16);
+
+// Run tasks with a small concurrency pool. sharp releases the event loop while
+// libvips works, so overlapping a few sheets is a real win even on one core, and a
+// large pool just thrashes memory on Vercel's 2-core builders.
+async function pooled(items, size, worker) {
+  const queue = [...items.entries()];
+  const results = new Array(items.length);
+  const runners = Array.from({ length: Math.min(size, items.length) }, async () => {
+    for (;;) {
+      const next = queue.shift();
+      if (!next) return;
+      const [i, item] = next;
+      results[i] = await worker(item, i);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
 
 // The art already ships with white sticker borders, so a sticker is the piece
 // trimmed to its content bounds.
@@ -34,9 +83,23 @@ async function dominant(input) {
   return `#${hex(d.r)}${hex(d.g)}${hex(d.b)}`;
 }
 
-async function buildSheet(srcPath, id, outDir, { layers = 'full' } = {}) {
+async function buildSheet(srcPath, id, outDir, { layers = 'full', cache = {}, next = {} } = {}) {
   const raw = await readFile(srcPath);
+  const key = `${id}:${layers}`;
+  const hash = hashOf(raw);
+
   const dir = join(outDir, id);
+  const wanted = ['final.webp', 'thumb.webp', ...(layers === 'full' ? ['cutout.webp'] : [])];
+
+  // A hit needs both a matching hash and every output still present on disk — a
+  // cache that trusts its own bookkeeping over the filesystem will happily emit a
+  // manifest pointing at files that were deleted.
+  const hit = cache[key];
+  if (hit && hit.hash === hash && wanted.every((f) => existsSync(join(dir, f)))) {
+    next[key] = hit;
+    return { ...hit.out, cached: true };
+  }
+
   await mkdir(dir, { recursive: true });
 
   const meta = await sharp(raw).metadata();
@@ -71,7 +134,8 @@ async function buildSheet(srcPath, id, outDir, { layers = 'full' } = {}) {
     out.layers.cutout = `art/${id}/cutout.webp`;
   }
 
-  return out;
+  next[key] = { hash, out };
+  return { ...out, cached: false };
 }
 
 // Notes are written by hand in content/notes.json. They are content, not derived
@@ -235,6 +299,26 @@ ${sections}
   await writeFile(dest, html);
 }
 
+// Anything in the output directory that no longer corresponds to a sheet we just
+// accounted for is stale: a piece whose source file was deleted, or output left by an
+// older settings version. Without this the directory grows forever, and since it is
+// committed as the build cache that growth ends up in git.
+async function prune(next) {
+  const keep = new Set(Object.keys(next).map((k) => k.split(':')[0]));
+  keep.add('video');
+
+  let removed = 0;
+  for (const entry of await readdir(OUT)) {
+    if (entry.startsWith('.') || entry.endsWith('.json') || keep.has(entry)) continue;
+    const full = join(OUT, entry);
+    if ((await stat(full)).isDirectory()) {
+      await rm(full, { recursive: true, force: true });
+      removed++;
+    }
+  }
+  return removed;
+}
+
 async function main() {
   // A deploy may ship prebuilt art instead of the source images. Treat that as
   // success rather than failing the build — the alternative is a CI failure on a
@@ -250,36 +334,47 @@ async function main() {
     process.exit(1);
   }
 
-  await rm(OUT, { recursive: true, force: true });
+  // Deliberately not wiping OUT. The existing output *is* the cache — clearing it
+  // guarantees a five-minute rebuild on every deploy, including deploys that only
+  // toggled a piece's visibility. Stale directories are pruned at the end instead.
   await mkdir(OUT, { recursive: true });
+
+  const cache = await loadCache();
+  const next = {};
 
   const meta = await loadMeta();
   const files = await imagesIn(SRC);
-  // `hidden` is set from the dashboard. Hidden pieces are still built — the images
-  // stay in the repo and can be brought back with one click — but they are left out
-  // of the manifest, so they appear on neither the wall nor the list.
-  const parents = files.filter((f) => !meta[f]?.child && !meta[f]?.hidden);
-  const hiddenCount = files.filter((f) => meta[f]?.hidden && !meta[f]?.child).length;
+  // `hidden` is set from the dashboard. Hidden pieces are still *derived* — they
+  // keep their cache entry and their files on disk — but they are left out of the
+  // manifest, so they appear on neither the wall nor the list.
+  //
+  // Deriving them matters: if hiding dropped a piece from the build, prune would
+  // delete its output and unhiding would pay the full cost again. Toggling should
+  // be free in both directions.
+  const parents = files.filter((f) => !meta[f]?.child);
+  const hiddenCount = parents.filter((f) => meta[f]?.hidden).length;
 
   console.log(`building ${parents.length} pieces from ${files.length} sheets`);
 
-  const pieces = [];
-  for (const file of parents) {
+  const concurrency = Math.max(2, Math.min(4, cpus().length));
+  let built = 0;
+  let reused = 0;
+
+  const results = await pooled(parents, concurrency, async (file) => {
     const id = basename(file, extname(file)).replace(/[^a-z0-9-]/gi, '-').toLowerCase();
     const m = meta[file] ?? {};
-    const t = Date.now();
 
     try {
-      const primary = await buildSheet(join(SRC, file), id, OUT);
+      const primary = await buildSheet(join(SRC, file), id, OUT, { cache, next });
 
       // Album sheets get final + thumb only. They are never the resting face of a
-      // piece, so nothing ever scrubs or stickers them, and generating their edge
-      // maps would roughly triple build time for layers nobody can reach.
+      // piece, so nothing stickers them, and a cutout per page would add work for
+      // a layer nothing can reach.
       const stack = [];
       for (const [i, child] of (m.stack ?? []).entries()) {
         if (!existsSync(join(SRC, child))) continue;
         const childId = `${id}--${i + 2}`;
-        stack.push(await buildSheet(join(SRC, child), childId, OUT, { layers: 'light' }));
+        stack.push(await buildSheet(join(SRC, child), childId, OUT, { layers: 'light', cache, next }));
       }
 
       // Video lives in source/video/ but must be served from the build output, or
@@ -304,7 +399,10 @@ async function main() {
       const timelapse = await copyVideo(m.timelapse);
       const preview = (await copyVideo(m.preview)) ?? timelapse;
 
-      pieces.push({
+      const fresh = [primary, ...stack].filter((x) => !x.cached).length;
+      if (fresh) built += fresh; else reused++;
+
+      return {
         id,
         title: m.title || id,
         label: m.label || '',
@@ -314,27 +412,42 @@ async function main() {
         preview,
         // Optional, written by scripts/tag-eyes.mjs. Absent means no eye tracking.
         eyes: m.eyes ?? null,
-        stack,
+        stack: stack.map(({ cached, ...rest }) => rest),
         ...primary,
-      });
-      console.log(`  ${id}${stack.length ? ` (+${stack.length})` : ''} ${Date.now() - t}ms`);
+        cached: undefined,
+        hidden: Boolean(m.hidden),
+      };
     } catch (err) {
       console.error(`  ${file} FAILED: ${err.message}`);
+      return null;
     }
-  }
+  });
+
+  // Hidden pieces drop out here, after being derived and cached. The bookkeeping
+  // fields are stripped so neither reaches the manifest.
+  const pieces = results
+    .filter(Boolean)
+    .filter((p) => !p.hidden)
+    .map(({ cached, hidden, ...rest }) => rest);
 
   // Margin material: loose doodles and annotations that fill the gaps between
   // finished pieces. Thumbnails only — they are decoration, never openable.
-  const margin = [];
-  for (const [i, f] of (await imagesIn(join(SRC, 'margin'))).entries()) {
+  const marginFiles = await imagesIn(join(SRC, 'margin'));
+  const marginResults = await pooled(marginFiles, concurrency, async (f, i) => {
     const id = `margin-${String(i + 1).padStart(2, '0')}`;
     try {
-      const built = await buildSheet(join(SRC, 'margin', f), id, OUT, { layers: 'light' });
-      margin.push({ id, ...built });
+      const out = await buildSheet(join(SRC, 'margin', f), id, OUT, {
+        layers: 'light', cache, next,
+      });
+      if (!out.cached) built++;
+      const { cached, ...rest } = out;
+      return { id, ...rest };
     } catch (err) {
       console.error(`  margin ${f} FAILED: ${err.message}`);
+      return null;
     }
-  }
+  });
+  const margin = marginResults.filter(Boolean);
 
   pieces.sort((a, b) => String(a.posted).localeCompare(String(b.posted)));
 
@@ -348,12 +461,17 @@ async function main() {
     notes,
   };
   await writeFile(join(OUT, 'manifest.json'), JSON.stringify(manifest));
+  await writeFile(join(OUT, CACHE_FILE), JSON.stringify({ settings: SETTINGS_VERSION, sheets: next }));
+
+  const pruned = await prune(next);
   await writeListPage(pieces, join(OUT, '..', 'list.html'));
   await writeNotesPage(notes, join(OUT, '..', 'notes.html'));
 
   const withDates = pieces.filter((p) => p.posted).length;
   console.log(`\n${pieces.length} pieces, ${margin.length} margin, ${notes.length} notes, ${withDates} dated`);
   if (hiddenCount) console.log(`${hiddenCount} piece(s) hidden from the dashboard`);
+  console.log(`${built} sheet(s) derived, ${reused} piece(s) reused from cache${pruned ? `, ${pruned} pruned` : ''}`);
+  if (built === 0) console.log('nothing changed — this was a manifest-only rebuild');
   console.log(`wrote ${OUT}/manifest.json`);
 }
 

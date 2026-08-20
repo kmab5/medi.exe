@@ -10,9 +10,14 @@
 
 const NS = 'http://www.w3.org/2000/svg';
 
-const MIN_GAP = 2600;
-const MAX_GAP = 7000;
-const MAX_CONCURRENT = 3;
+const MIN_GAP = 700;
+const MAX_GAP = 2600;
+const MAX_CONCURRENT = 9;
+
+// A burst spawns several marks at once, the way a hand lays down a few lines
+// together rather than one every few seconds.
+const BURST_CHANCE = 0.45;
+const BURST_MAX = 3;
 
 export class Strokes {
   constructor(host, { reduced = false } = {}) {
@@ -43,7 +48,7 @@ export class Strokes {
   start() {
     if (this.reduced) return;
     const loop = () => {
-      this.spawn();
+      this.burst();
       this.timer = setTimeout(loop, MIN_GAP + Math.random() * (MAX_GAP - MIN_GAP));
     };
     this.timer = setTimeout(loop, 1200);
@@ -52,6 +57,64 @@ export class Strokes {
   stop() {
     clearTimeout(this.timer);
     window.removeEventListener('resize', this.onResize);
+  }
+
+  // Four kinds of mark, so density reads as drawing rather than as noise. A page of
+  // identical sweeps at this frequency just looks like a screensaver.
+  pick() {
+    const r = Math.random();
+    if (r < 0.5) return 'sweep';
+    if (r < 0.72) return 'arc';
+    if (r < 0.9) return 'hatch';
+    return 'loop';
+  }
+
+  // A short straight-ish tick, the kind you make while blocking something in.
+  hatchPath() {
+    const { w, h } = this;
+    const x = w * (0.08 + Math.random() * 0.84);
+    const y = h * (0.08 + Math.random() * 0.84);
+    const len = 40 + Math.random() * 190;
+    const angle = Math.random() * Math.PI * 2;
+    const dx = Math.cos(angle) * len;
+    const dy = Math.sin(angle) * len;
+    // A slight bow, because nothing drawn by hand is straight.
+    const bow = (Math.random() - 0.5) * len * 0.22;
+    return `M ${x.toFixed(1)} ${y.toFixed(1)} Q ${(x + dx / 2 - dy * 0.1 + bow).toFixed(1)} ${(y + dy / 2 + dx * 0.1).toFixed(1)} ${(x + dx).toFixed(1)} ${(y + dy).toFixed(1)}`;
+  }
+
+  // An open circular scribble, the shape of someone circling a detail.
+  loopPath() {
+    const { w, h } = this;
+    const cx = w * (0.15 + Math.random() * 0.7);
+    const cy = h * (0.15 + Math.random() * 0.7);
+    const r = 40 + Math.random() * 150;
+    const squash = 0.55 + Math.random() * 0.7;
+    const turn = Math.random() * Math.PI * 2;
+    const points = [];
+    // Slightly more than a full turn, so the ends overshoot each other.
+    for (let a = 0; a <= Math.PI * 2.25; a += Math.PI / 6) {
+      const wobble = 1 + (Math.random() - 0.5) * 0.16;
+      points.push([
+        cx + Math.cos(a + turn) * r * wobble,
+        cy + Math.sin(a + turn) * r * squash * wobble,
+      ]);
+    }
+    return points
+      .map(([x, y], i) => `${i ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`)
+      .join(' ');
+  }
+
+  // A single broad curve across part of the page.
+  arcPath() {
+    const { w, h } = this;
+    const x1 = w * (Math.random() * 0.5);
+    const y1 = h * (0.1 + Math.random() * 0.8);
+    const x2 = x1 + w * (0.3 + Math.random() * 0.5);
+    const y2 = h * (0.1 + Math.random() * 0.8);
+    const cx = (x1 + x2) / 2 + (Math.random() - 0.5) * w * 0.3;
+    const cy = (y1 + y2) / 2 + (Math.random() - 0.5) * h * 0.5;
+    return `M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
   }
 
   // A stroke enters from one edge and leaves by another, wandering through a few
@@ -94,15 +157,34 @@ export class Strokes {
     return d;
   }
 
-  spawn() {
+  // A burst lays down two or three marks together. Spacing every mark evenly makes
+  // the page feel mechanical; clustering them reads as a hand working.
+  burst() {
+    const n = Math.random() < BURST_CHANCE ? 1 + Math.floor(Math.random() * BURST_MAX) : 1;
+    for (let i = 0; i < n; i++) {
+      setTimeout(() => this.spawn(), i * (90 + Math.random() * 260));
+    }
+  }
+
+  spawn(kind = this.pick()) {
     if (this.live >= MAX_CONCURRENT || document.hidden) return;
 
+    const d = kind === 'hatch' ? this.hatchPath()
+      : kind === 'loop' ? this.loopPath()
+      : kind === 'arc' ? this.arcPath()
+      : this.path();
+
     const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', this.path());
+    path.setAttribute('d', d);
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-width', (1.2 + Math.random() * 3.4).toFixed(2));
-    path.setAttribute('opacity', (0.1 + Math.random() * 0.14).toFixed(3));
+    path.setAttribute('stroke-linejoin', 'round');
+    // Small marks get a finer line, so a hatch does not read as a fat smudge.
+    const weight = kind === 'hatch' || kind === 'loop'
+      ? 0.9 + Math.random() * 1.8
+      : 1.2 + Math.random() * 3.4;
+    path.setAttribute('stroke-width', weight.toFixed(2));
+    path.setAttribute('opacity', (0.09 + Math.random() * 0.15).toFixed(3));
     this.svg.appendChild(path);
 
     const length = path.getTotalLength();
@@ -114,9 +196,12 @@ export class Strokes {
     path.style.strokeDasharray = `${length}`;
     this.live++;
 
-    const drawMs = 1400 + Math.random() * 2600;
-    const holdMs = 900 + Math.random() * 2400;
-    const eraseMs = 900 + Math.random() * 1800;
+    // Short marks are made quickly; a page-spanning sweep takes its time. Scaling
+    // by length keeps the apparent speed of the pen roughly constant.
+    const pace = Math.min(2.2, Math.max(0.35, length / 900));
+    const drawMs = (700 + Math.random() * 1500) * pace;
+    const holdMs = 700 + Math.random() * 2600;
+    const eraseMs = (500 + Math.random() * 1100) * pace;
 
     // Draw in from the start, then undraw from that same end, so the mark retreats
     // the way it arrived instead of dissolving.

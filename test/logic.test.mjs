@@ -127,3 +127,101 @@ test('world drives bodies and reports settling once', () => {
   }
   assert.equal(settled, 1, 'settle fired more than once');
 });
+
+// --- build cache ---
+// The cache decides whether a deploy takes seconds or minutes, and a wrong hit
+// serves stale art. These check the invalidation rules directly.
+
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const run = promisify(execFile);
+
+const FIXTURE_SRC = 'test/.fixture-src';
+const FIXTURE_OUT = 'test/.fixture-out';
+
+async function makeFixture() {
+  const sharp = (await import('sharp')).default;
+  await rm(FIXTURE_SRC, { recursive: true, force: true });
+  await rm(FIXTURE_OUT, { recursive: true, force: true });
+  await mkdir(FIXTURE_SRC, { recursive: true });
+  for (const [name, colour] of [['a.jpg', '#c34'], ['b.jpg', '#39a']]) {
+    await sharp({ create: { width: 300, height: 400, channels: 3, background: colour } })
+      .jpeg().toFile(`${FIXTURE_SRC}/${name}`);
+  }
+  await writeFile(`${FIXTURE_SRC}/meta.json`, JSON.stringify({
+    'a.jpg': { title: 'A', stack: [] },
+    'b.jpg': { title: 'B', stack: [] },
+  }));
+}
+
+const build = () => run('node', ['scripts/build.mjs', FIXTURE_SRC, FIXTURE_OUT]);
+const derivedCount = (stdout) => Number(stdout.match(/(\d+) sheet\(s\) derived/)?.[1] ?? -1);
+
+test('a second build derives nothing', async () => {
+  await makeFixture();
+  const first = await build();
+  assert.equal(derivedCount(first.stdout), 2, 'cold build should derive both sheets');
+
+  const second = await build();
+  assert.equal(derivedCount(second.stdout), 0, 'warm build re-derived work it had cached');
+});
+
+test('changing a source image invalidates only that sheet', async () => {
+  const sharp = (await import('sharp')).default;
+  await sharp({ create: { width: 300, height: 400, channels: 3, background: '#0f0' } })
+    .jpeg().toFile(`${FIXTURE_SRC}/a.jpg`);
+
+  const out = await build();
+  assert.equal(derivedCount(out.stdout), 1, 'should rebuild exactly the changed sheet');
+});
+
+test('hiding a piece keeps its files and its cache entry', async () => {
+  const meta = JSON.parse(await readFile(`${FIXTURE_SRC}/meta.json`, 'utf8'));
+  meta['a.jpg'].hidden = true;
+  await writeFile(`${FIXTURE_SRC}/meta.json`, JSON.stringify(meta));
+
+  const out = await build();
+  assert.equal(derivedCount(out.stdout), 0, 'hiding should not derive anything');
+  assert.ok(existsSync(`${FIXTURE_OUT}/a/final.webp`), 'hiding deleted the derived files');
+
+  const manifest = JSON.parse(await readFile(`${FIXTURE_OUT}/manifest.json`, 'utf8'));
+  assert.equal(manifest.pieces.length, 1, 'hidden piece still in the manifest');
+  assert.ok(!manifest.pieces.some((p) => p.id === 'a'));
+
+  // And unhiding must be just as cheap, which is the whole point.
+  delete meta['a.jpg'].hidden;
+  await writeFile(`${FIXTURE_SRC}/meta.json`, JSON.stringify(meta));
+  const back = await build();
+  assert.equal(derivedCount(back.stdout), 0, 'unhiding paid to re-derive');
+  assert.equal(JSON.parse(await readFile(`${FIXTURE_OUT}/manifest.json`, 'utf8')).pieces.length, 2);
+});
+
+test('a changed settings version invalidates the whole cache', async () => {
+  const cachePath = `${FIXTURE_OUT}/.cache.json`;
+  const cache = JSON.parse(await readFile(cachePath, 'utf8'));
+  cache.settings = 'something-else';
+  await writeFile(cachePath, JSON.stringify(cache));
+
+  const out = await build();
+  assert.equal(derivedCount(out.stdout), 2, 'settings change should rebuild everything');
+});
+
+test('deleting a source image prunes its output', async () => {
+  await rm(`${FIXTURE_SRC}/b.jpg`);
+  const meta = JSON.parse(await readFile(`${FIXTURE_SRC}/meta.json`, 'utf8'));
+  delete meta['b.jpg'];
+  await writeFile(`${FIXTURE_SRC}/meta.json`, JSON.stringify(meta));
+
+  await build();
+  assert.ok(!existsSync(`${FIXTURE_OUT}/b`), 'orphaned output was left behind');
+  assert.ok(existsSync(`${FIXTURE_OUT}/a/final.webp`), 'prune removed a live piece');
+
+  await rm(FIXTURE_SRC, { recursive: true, force: true });
+  await rm(FIXTURE_OUT, { recursive: true, force: true });
+  // The build writes its pages beside the output directory, so a fixture run leaves
+  // list.html and notes.html in test/. Clean them up rather than gitignoring them.
+  await rm('test/list.html', { force: true });
+  await rm('test/notes.html', { force: true });
+});
